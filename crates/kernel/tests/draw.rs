@@ -390,3 +390,87 @@ fn a_stroke_closes_into_a_face_against_another_sketchs_edge_on_its_plane() {
         "{out:?}"
     );
 }
+
+/// sketchcraft E-19: the fourth wall of an open box closed by one line along its top. Its
+/// bottom edge is on the ground (a chain drawn there), its sides are the walls' edges: the
+/// line, drawn level where nothing closes, goes onto the upright plane where it closes a
+/// loop with those three edges of three other sketches.
+#[test]
+fn one_line_closes_a_face_with_edges_of_three_other_sketches() {
+    let mut m = Model::with_ground_sketch();
+    let draw = |m: &mut Model, origin: [f64; 3], normal: [f64; 3], points: Vec<[f64; 3]>| {
+        m.apply(&Op::Draw {
+            target: DrawTarget::Plane { origin, normal },
+            points,
+            closed: false,
+            curve: None,
+        })
+        .unwrap()
+    };
+    // The ground: the front edge y = 0 and the two side feet, as one chain.
+    draw(
+        &mut m,
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+        vec![
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+        ],
+    );
+    // The two side walls, upright on x = 0 and x = 1, each a closed loop with its foot.
+    for x in [0.0, 1.0] {
+        let out = draw(
+            &mut m,
+            [x, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            vec![[x, 0.0, 0.0], [x, 0.0, 1.0], [x, 1.0, 1.0], [x, 1.0, 0.0]],
+        );
+        assert!(
+            matches!(out, OpOutcome::Drawn { ref regions, .. } if regions.len() == 1),
+            "side wall {x}: {out:?}"
+        );
+    }
+    let sketches = m.sketches().len();
+    // The front wall's top, drawn level (a single line has no plane of its own).
+    let out = draw(
+        &mut m,
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0],
+        vec![[0.0, 0.0, 1.0], [1.0, 0.0, 1.0]],
+    );
+    let OpOutcome::Drawn {
+        sketch: Some(s),
+        ref regions,
+        ..
+    } = out
+    else {
+        panic!("{out:?}")
+    };
+    assert_eq!(regions.len(), 1, "the front wall is a face: {out:?}");
+    let front = *m
+        .sketches()
+        .into_iter()
+        .find(|(k, _)| *k == s)
+        .expect("the front sketch")
+        .1
+        .plane();
+    assert!(
+        (front.normal.y.abs() - 1.0).abs() < 1e-9,
+        "upright on y = 0: {front:?}"
+    );
+    // No empty level sketch was left behind: only the front one was added.
+    assert_eq!(m.sketches().len(), sketches + 1);
+    // A lone line that closes nothing stays where it was drawn.
+    let out = draw(
+        &mut m,
+        [0.0, 0.0, 3.0],
+        [0.0, 0.0, 1.0],
+        vec![[5.0, 5.0, 3.0], [6.0, 5.0, 3.0]],
+    );
+    assert!(
+        matches!(out, OpOutcome::Drawn { ref regions, .. } if regions.is_empty()),
+        "{out:?}"
+    );
+}

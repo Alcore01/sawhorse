@@ -114,3 +114,18 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 1 test neuf, qui échouait avant (`regions: []`) et passe après ; `cargo test --workspace` : 699 passés (698 + 1), 3 ignorés, aucun échec (dont les empreintes « golden » du noyau). Niveau : testé (noyau) ; essai dans le navigateur par JC à faire.
 - Limites connues : les arêtes des faces des solides (volumes déjà poussés) ne sont pas encore partagées ; un tracé fermé d'un coup (`closed`) n'en importe pas (il n'en a pas besoin pour se fermer) ; effacer l'arête commune n'efface que celle de l'esquisse visée.
+
+## H-20261116-8 · correction · module · Fermeture contre les arêtes d'autres esquisses, généralisée (E-19)
+
+- Origine : JC, 16 nov. 2026, 14 h 58 : capture sans texte d'une boîte de quatre murs tracés à la ligne, le quatrième non rempli ; E-19 ; suite de H-20261116-7.
+- Constat : la règle de H-20261116-7 n'importait une arête d'une autre esquisse que si ses deux bouts étaient déjà des points du tracé. Le 4e mur se ferme avec trois arêtes de trois esquisses (les deux montants des murs, le pied au sol) : le pied ne touchait pas le tracé. De plus, une ligne seule n'a pas de plan : l'outil la range sur un plan horizontal, où rien ne se ferme. Reproduit par un test, qui échoue avec le noyau de H-20261116-7.
+- Fichiers :
+  - `crates/kernel/src/model.rs` : `draw_in_sketch_closing` remplace la règle : après un tracé ouvert, les arêtes des autres esquisses du contexte situées dans son plan et reliées au tracé (de proche en proche) y sont ajoutées, seulement si elles ferment un contour, sinon rien ne change (`import_connected`, `edges_on_plane`) ; un tracé droit qui ne ferme rien sur son plan essaie les plans passant par lui et une arête qui le touche, et va sur le premier où il ferme un contour (esquisse existante de ce plan, ou nouvelle), l'esquisse vide laissée derrière étant retirée (`close_on_another_plane`, `straight`). Seulement pour les tracés sur un plan (cible `plane`, celle des outils de dessin) sans courbe ; `coplanar_edges_at` (H-20261116-7) est retiré.
+  - `crates/kernel/tests/draw.rs` : 1 test (le 4e mur fermé d'une ligne en haut ; une ligne qui ne ferme rien reste où elle a été tracée).
+- Correction : comme dans SketchUp, une ligne qui ferme un contour plan avec des arêtes existantes, quelles que soient leurs esquisses, crée la face.
+- Écarté : changer de plan pour une ligne qui ne ferme rien (elle reste où l'outil la met) ; chercher les plans des arêtes qui ne touchent pas la ligne (coût, et ambiguïté).
+- Effet sur les résultats : une ligne qui ferme une face peut être rangée dans une autre esquisse que celle du plan demandé ; l'issue de l'opération dit laquelle.
+- Effet sur les projets existants : aucun à l'ouverture ; pas de changement de format. Il faut recompiler le noyau (`npm run wasm`).
+- Confidentialité : non.
+- Vérification : le test neuf échoue avec le noyau de H-20261116-7 et passe ; le test de H-20261116-7 passe toujours ; `cargo test --workspace` : 700 passés (699 + 1), 3 ignorés, aucun échec (dont le fuzzer de séquences et les empreintes « golden »). Niveau : testé (noyau) ; essai dans le navigateur par JC à faire.
+- Limites connues : seules les esquisses sont partagées, pas les faces des volumes poussés ; si plusieurs plans conviennent pour une ligne, le premier trouvé l'emporte.
