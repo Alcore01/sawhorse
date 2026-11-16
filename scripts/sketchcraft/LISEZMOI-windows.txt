@@ -1,0 +1,29 @@
+sketchcraft pour Windows
+========================
+
+Installer
+---------
+1. Décompressez ce paquet (par exemple sur le Bureau).
+2. Ouvrez le dossier sketchcraft, puis double-cliquez sur installer.cmd.
+   - Si Node n'est pas installé, l'installateur propose de l'installer (winget).
+   - L'application est copiée dans %LOCALAPPDATA%\sketchcraft, et chaque fichier est vérifié.
+   - Un raccourci sketchcraft est créé sur le Bureau et dans le menu Démarrer.
+3. Le dossier décompressé peut ensuite être supprimé.
+
+Lancer
+------
+Double-cliquez sur l'icône sketchcraft. Une petite fenêtre (réduite dans la barre des
+tâches) garde le serveur local, et l'application s'ouvre dans votre navigateur.
+Fermer cette fenêtre arrête sketchcraft. Rien n'est accessible depuis le réseau : le
+serveur n'écoute que sur cet ordinateur (127.0.0.1).
+
+Mettre à jour
+-------------
+Installez le nouveau paquet de la même façon. La version précédente est gardée dans
+%LOCALAPPDATA%\sketchcraft\sauvegardes\.
+
+Retirer les raccourcis
+----------------------
+Dans une invite de commandes ouverte dans ce dossier : installer.cmd -Retirer
+
+La version installée est écrite dans VERSION.txt.
