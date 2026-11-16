@@ -910,3 +910,40 @@ fn two_hovered_points_align_at_once() {
     let r = run(&m, &q);
     assert!(close(r.point, [2.0, 0.0, 1.5]), "{:?}", r.point);
 }
+
+#[test]
+fn a_hovered_points_alignment_crosses_a_guide_and_an_edge() {
+    // sketchcraft E-21: a roof pitch guide from the eaves corner (0, 0, 1) at 37 degrees;
+    // plumb with the far corner (1.5, 0, 1): drawing along the guide stops right above it,
+    // where the corner's blue alignment crosses the guide (it used to give way to On Guide).
+    let mut m = model(&[]);
+    let a = 37f64.to_radians();
+    m.apply(&Op::AddGuide {
+        point: [0.0, 0.0, 1.0],
+        dir: Some([a.cos(), 0.0, a.sin()]),
+    })
+    .unwrap();
+    let top = 1.0 + 1.5 * a.tan();
+    let front = |x: f64, z: f64| {
+        let mut q = side_x(0.0, 0.0, 0.001);
+        q.origin = [x, -10.0, z];
+        q.dir = [0.0, 1.0, 0.0];
+        q.px.eye = q.origin;
+        q.px.forward = q.dir;
+        q.grid = false;
+        q
+    };
+    let mut q = front(1.5 + 0.002, top + 0.003);
+    q.start = Some([0.0, 0.0, 1.0]);
+    q.anchors = vec![[1.5, 0.0, 1.0]];
+    let r = run(&m, &q);
+    assert_eq!(r.kind, K::FromPoint, "{r:?}");
+    assert!(close(r.point, [1.5, 0.0, top]), "{:?}", r.point);
+    // The same with an edge in place of the guide: a ground edge along red, and a corner
+    // hovered above it: plumb with the corner, on the edge.
+    let m = model(&[rect(0.0, 0.0, 2.0, 1.0)]);
+    let mut q = down(1.2 + 0.003, 0.002, 0.001);
+    q.anchors = vec![[1.2, 0.7, 0.0]];
+    let r = run(&m, &q);
+    assert!(close(r.point, [1.2, 0.0, 0.0]), "{r:?}");
+}
