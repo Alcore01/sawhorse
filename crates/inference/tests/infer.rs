@@ -532,9 +532,14 @@ fn the_grid_snaps_only_when_nothing_else_is_near() {
     // Halfway between grid lines: free.
     assert_eq!(run(&m, &down(3.5 * IN, 5.5 * IN, 0.001)).kind, K::Free);
     // Zoomed out (1 cm/px): 1 in cells are 2.5 px, too dense; the 1 ft grid takes over.
+    // (sketchcraft E-14: that point is 3 px from the red axis, which now snaps first, with
+    // its length rounded to the same 1 ft step; a point off the axes still gets the grid.)
     let r = run(&m, &down(12.0 * IN + 0.05, 0.03, 0.01));
-    assert_eq!(r.kind, K::Grid);
+    assert_eq!(r.kind, K::AxisX);
     assert!(close(r.point, [12.0 * IN, 0.0, 0.0]));
+    let r = run(&m, &down(12.0 * IN + 0.05, 24.0 * IN + 0.03, 0.01));
+    assert_eq!(r.kind, K::Grid);
+    assert!(close(r.point, [12.0 * IN, 24.0 * IN, 0.0]));
     // Metric steps.
     let mut q = down(0.031, 0.069, 0.001);
     q.grid_step = Some([0.01, 0.1]);
@@ -703,4 +708,95 @@ fn an_edge_of_the_face_under_the_cursor_is_not_hidden_by_it_when_seen_obliquely(
     let r = run(&m, &q);
     assert_eq!(r.kind, K::OnEdge, "{r:?}");
     assert!(r.point[2].abs() < 1e-12);
+}
+
+// ---- sketchcraft E-14: SketchUp-like snapping for building massing ----------------------
+
+/// Looking along -x at (y, z) (the Right view), `mpp` metres per pixel.
+fn side_x(y: f64, z: f64, mpp: f64) -> InferQuery {
+    InferQuery {
+        origin: [10.0, y, z],
+        dir: [-1.0, 0.0, 0.0],
+        px: PixelModel {
+            ortho: true,
+            scale: mpp,
+            eye: [10.0, y, z],
+            forward: [-1.0, 0.0, 0.0],
+        },
+        ..down(0.0, 0.0, mpp)
+    }
+}
+
+#[test]
+fn the_origin_snaps_like_an_endpoint() {
+    let m = model(&[]);
+    let mut q = down(0.004, 0.003, 0.001);
+    q.grid = false;
+    let r = run(&m, &q);
+    assert_eq!(r.kind, K::Endpoint, "{r:?}");
+    assert_eq!(r.point, [0.0, 0.0, 0.0]);
+}
+
+#[test]
+fn the_model_axes_are_lines_to_snap_on() {
+    // Nothing drawn: near the blue axis, 3 px off it, half a metre up.
+    let m = model(&[]);
+    let r = run(&m, &side_x(0.003, 0.5, 0.001));
+    assert_eq!(r.kind, K::AxisZ, "{r:?}");
+    assert!(close(r.point, [0.0, 0.0, 0.5]), "{:?}", r.point);
+    assert_eq!(r.tip, "On Blue Axis");
+}
+
+#[test]
+fn a_line_along_an_axis_stops_where_it_crosses_a_model_axis() {
+    // JC's case (16 nov. 2026): a rectangle drawn line by line on the upright plane x = 0,
+    // from the origin: bottom line along green, a vertical up 1.2 m, then back along green
+    // from the top. The end is right above the origin, where the green line from the start
+    // crosses the blue axis: it snaps there, with no corner to hover first.
+    let m = model(&[]);
+    let mut q = side_x(0.006, 1.2 + 0.004, 0.001);
+    q.start = Some([0.0, 1.2, 1.2]);
+    q.plane = Some(PlaneQ {
+        origin: [0.0, 0.0, 0.0],
+        normal: [1.0, 0.0, 0.0],
+    });
+    q.grid = false;
+    let r = run(&m, &q);
+    assert!(close(r.point, [0.0, 0.0, 1.2]), "{r:?}");
+    assert_eq!(r.kind, K::Intersection);
+}
+
+#[test]
+fn a_line_along_an_axis_stops_where_it_crosses_a_guide() {
+    // A guide line across the drawing (from the Tape or the Protractor): the axis line from
+    // the start snaps to the crossing, as it does with an edge.
+    let mut m = model(&[]);
+    m.apply(&Op::AddGuide {
+        point: [0.8, 0.0, 0.0],
+        dir: Some([0.6, 0.8, 0.0]),
+    })
+    .unwrap();
+    let mut q = down(1.1 + 0.004, 0.4 + 0.003, 0.001);
+    q.start = Some([0.0, 0.4, 0.0]);
+    q.grid = false;
+    let r = run(&m, &q);
+    assert!(close(r.point, [1.1, 0.4, 0.0]), "{r:?}");
+    assert_eq!(r.kind, K::Intersection);
+}
+
+#[test]
+fn far_from_the_start_the_axis_holds_within_a_few_degrees() {
+    // 2 m along red, 12 px off it: the axis still holds (about 3.4 degrees seen from the
+    // start), as SketchUp's does; near the start the tolerance stays 7 px.
+    let m = model(&[]);
+    let mut q = down(2.0, 0.012, 0.001);
+    q.start = Some([0.0, 0.0, 0.0]);
+    q.grid = false;
+    let r = run(&m, &q);
+    assert_eq!(r.kind, K::AxisX, "{r:?}");
+    assert!(close(r.point, [2.0, 0.0, 0.0]), "{:?}", r.point);
+    let mut q = down(0.1, 0.012, 0.001);
+    q.start = Some([0.0, 0.0, 0.0]);
+    q.grid = false;
+    assert_eq!(run(&m, &q).kind, K::Free);
 }

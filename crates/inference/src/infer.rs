@@ -356,6 +356,10 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
     for a in &scene.arcs {
         points.extend(ctx.point(InferenceKind::Centre, a.centre, None));
     }
+    // sketchcraft E-14: the origin snaps like an endpoint (on the drawing plane, if any).
+    if ctx.on_plane(DVec3::ZERO) {
+        points.extend(ctx.point(InferenceKind::Endpoint, DVec3::ZERO, None));
+    }
     for g in &scene.guides {
         if g.dir == DVec3::ZERO {
             points.extend(ctx.point(
@@ -486,11 +490,38 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
             });
         }
     }
+    // sketchcraft E-14: the model's axes (through the origin) are lines to snap on, as in
+    // SketchUp; they rank with edges and guides.
+    // A start on an axis already has that line (with its length snapping and the lines a
+    // rectangle skips): the axis is not offered twice.
+    if ctx.on_plane(DVec3::ZERO) {
+        for &d in &AXES {
+            if !ctx.in_plane(d) || start.is_some_and(|s| s.cross(d).length() <= 1e-9) {
+                continue;
+            }
+            if let Some((p, dpx)) = ctx.on_line(DVec3::ZERO, d)
+                && dpx <= q.line_px
+                && visible(&px, hit.as_ref(), p, ray.param(p))
+            {
+                let (p, dpx) = snap_length(q, &ctx, DVec3::ZERO, d, p).unwrap_or((p, dpx));
+                let k = axis_kind(d);
+                lines.push(Cand {
+                    kind: k,
+                    rank: InferenceKind::OnEdge.priority(),
+                    point: p,
+                    px: dpx,
+                    t: ray.param(p),
+                    entity: None,
+                    lines: vec![line(DVec3::ZERO, p, k)],
+                });
+            }
+        }
+    }
     let mut constraint: Vec<Cand> = Vec::new();
     if let Some(s) = start {
         for (d, k) in start_directions(q, &ctx) {
             if let Some((p, dpx)) = ctx.on_line(s, d)
-                && dpx <= q.line_px
+                && dpx <= start_line_px(q, &ctx, s, p)
                 && p.distance(s) > 1e-9
             {
                 let (p, dpx) = snap_length(q, &ctx, s, d, p).unwrap_or((p, dpx));
@@ -556,6 +587,43 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
             {
                 x.lines = vec![line(a, p, c.kind)];
                 crossings.push(x);
+            }
+        }
+    }
+    // sketchcraft E-14: ... and so does a line from the start crossing a guide line or a
+    // model axis (the corner right above the origin, a pitch line from the Protractor).
+    if let Some(s) = start {
+        let mut targets: Vec<(DVec3, DVec3)> = scene
+            .guides
+            .iter()
+            .filter(|g| g.dir != DVec3::ZERO)
+            .map(|g| (g.point, g.dir.normalize_or_zero()))
+            .collect();
+        if ctx.on_plane(DVec3::ZERO) {
+            targets.extend(AXES.iter().map(|&d| (DVec3::ZERO, d)));
+        }
+        for c in constraint.iter().filter(|c| c.kind != InferenceKind::FromPoint) {
+            let d = (c.point - s).normalize_or_zero();
+            if d == DVec3::ZERO {
+                continue;
+            }
+            for &(o, v) in &targets {
+                if v == DVec3::ZERO || d.cross(v).length() < 1e-9 {
+                    continue;
+                }
+                let Some((u, w)) = line_line(s, d, o, v) else {
+                    continue;
+                };
+                let (p, r) = (s + d * u, o + v * w);
+                if p.distance(r) > 1e-9 * (1.0 + p.length()) || u.abs() < 1e-9 {
+                    continue;
+                }
+                if let Some(mut x) = ctx.point(InferenceKind::Intersection, p, None)
+                    && x.px <= q.point_px
+                {
+                    x.lines = vec![line(s, p, c.kind)];
+                    crossings.push(x);
+                }
             }
         }
     }
@@ -762,6 +830,14 @@ fn adjacent_surface(scene: &Scene, ray: &Ray, p: DVec3) -> Option<SurfaceHit> {
             t: ray.param(p),
         }
     })
+}
+
+/// sketchcraft E-14: how far (screen pixels) the cursor may be from a line through the
+/// gesture start and still snap to it: `line_px` near the start, then an angle of about 3.4
+/// degrees seen from the start (as SketchUp's axes hold on a long line), at most 30 px.
+fn start_line_px(q: &InferQuery, ctx: &Ctx, s: DVec3, p: DVec3) -> f64 {
+    let from_start_px = s.distance(p) / ctx.px.at(p).max(1e-12);
+    q.line_px.max((from_start_px * 0.06).min(30.0))
 }
 
 /// Length snapping along a line from the gesture start: when grid snapping is on, round the
