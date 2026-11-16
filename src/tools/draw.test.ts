@@ -132,6 +132,62 @@ describe("draw tools", () => {
     expect(t.busy()).toBe(false);
   });
 
+  it("Line (sketchcraft E-18): a free chain turns up off the ground without stopping, and the upright loop closes on one plane", async () => {
+    const h = fakeHost({ outcome: { kind: "drawn", sketch: 1, regions: [], faces: [], inside: null } });
+    const t = new LineTool(h);
+    const click = async (p: V3, kind: "grid" | "axis-z" | "axis-x" | "endpoint" = "grid") => {
+      t.onEvent(ev("click", p, { snapKind: kind }));
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    await click([0, 0, 0]);
+    await click([1, 0, 0]);
+    expect(lastOp(h)).toMatchObject({ target: { on: "plane", normal: [0, 0, 1] } });
+    // The next point is not held to the ground: the blue axis can snap.
+    expect(t.inferContext().plane).toBeNull();
+    await click([1, 0, 1], "axis-z");
+    // The ground segment is undone and drawn again with the new one on the upright plane.
+    expect(h.ops.at(-2)).toEqual({ op: "undo" });
+    const up = lastOp(h) as { target: { on: string; normal: V3 }; points: V3[] };
+    expect(up.target.on).toBe("plane");
+    expect(Math.abs(up.target.normal[1])).toBeCloseTo(1, 12);
+    expect(up.points).toEqual([[0, 0, 0], [1, 0, 0], [1, 0, 1]]);
+    expect(t.busy()).toBe(true);
+    await click([0, 0, 1], "axis-x");
+    expect((lastOp(h) as { points: V3[] }).points).toEqual([[1, 0, 1], [0, 0, 1]]);
+    expect(h.ops.filter((o) => (o as { op: string }).op === "undo")).toHaveLength(1);
+    await click([0, 0, 0], "endpoint"); // back to the start: closed, on the same plane
+    const last = lastOp(h) as { target: { normal: V3 }; points: V3[] };
+    expect(Math.abs(last.target.normal[1])).toBeCloseTo(1, 12);
+    expect(t.busy()).toBe(false);
+  });
+
+  it("Line (E-18): after two segments on one plane, a turn off it starts a new plane and undoes nothing", async () => {
+    const h = fakeHost({ outcome: { kind: "drawn", sketch: 1, regions: [], faces: [], inside: null } });
+    const t = new LineTool(h);
+    for (const p of [[0, 0, 0], [1, 0, 0], [1, 1, 0]] as V3[]) {
+      t.onEvent(ev("click", p, { snapKind: "grid" }));
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    t.onEvent(ev("click", [1, 1, 1], { snapKind: "axis-z" }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(h.ops.some((o) => (o as { op: string }).op === "undo")).toBe(false);
+    expect((lastOp(h) as { points: V3[] }).points).toEqual([[1, 1, 0], [1, 1, 1]]);
+  });
+
+  it("Line (E-18): a plane chosen with the arrow keys still holds the chain", async () => {
+    const h = fakeHost({ outcome: { kind: "drawn", sketch: 1, regions: [], faces: [], inside: null } });
+    const t = new LineTool(h);
+    t.onKey({ key: "ArrowUp" } as KeyboardEvent);
+    t.onEvent(ev("click", [0, 0, 0], { snapKind: "grid" }));
+    await new Promise((r) => setTimeout(r, 0));
+    t.onEvent(ev("click", [1, 0, 0], { snapKind: "grid" }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(t.inferContext().plane).not.toBeNull();
+    t.onEvent(ev("click", [1, 0, 1], { snapKind: "axis-z" }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(h.statuses.at(-1)?.text).toMatch(/off this line's plane/);
+  });
+
   it("Line: typed length along the cursor direction", async () => {
     const h = fakeHost({ outcome: { kind: "drawn", sketch: 1, regions: [], faces: [], inside: null } });
     const t = new LineTool(h);
