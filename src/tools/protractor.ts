@@ -11,7 +11,7 @@
 // on the side of the reference the cursor is on.
 import type { V3 } from "../kernel/types";
 import { INFERENCE_STYLES } from "../lib/inferenceStyle";
-import { add, alignedFrame, dist, dot, mul, sub, unit } from "./draw";
+import { add, alignedFrame, cross, dist, dot, mul, sub, unit } from "./draw";
 import { AXIS_KEYS, TICK_DEG, axisWords, fmtDeg, parseAngle, rotate, snapTurn } from "./rotate";
 import { EMPTY_VIEW, Tool, inferenceLine, markerOf, type InferContext, type Snap, type ToolEvent, type ToolView } from "./tool";
 import { projectToPlane, signedAngle } from "./xform";
@@ -196,27 +196,33 @@ export class ProtractorTool extends Tool {
     if (!centre) return { ...EMPTY_VIEW, marker };
     const overlay = [...inferenceLine(this.snap)];
     const r = this.radius(centre);
-    const f = alignedFrame(centre, normal);
-    const at = (a: number, rr = r) => add(centre, add(mul(f.u, Math.cos(a) * rr), mul(f.v, Math.sin(a) * rr)));
-    const an = normal.map(Math.abs);
+    const n = unit(normal);
+    const an = n.map(Math.abs);
     const color = an[0] > 1 - 1e-9 ? INFERENCE_STYLES["axis-x"].token : an[1] > 1 - 1e-9 ? INFERENCE_STYLES["axis-y"].token : an[2] > 1 - 1e-9 ? INFERENCE_STYLES["axis-z"].token : "--sel";
-    // Half a protractor on the reference's side once it is known, a full ring before.
-    const from = g?.ref ? Math.atan2(dot(g.ref, f.v), dot(g.ref, f.u)) : 0;
-    const span = g?.ref ? Math.PI : 2 * Math.PI;
-    const sideSign = g && g.angle < 0 ? -1 : 1;
+    // E-20: the protractor's zero, as in SketchUp: the reference once clicked; before that
+    // it turns with the cursor (where the reference will be); hovering, the plane's level.
+    const toCursor = g && !g.ref && g.cursor ? sub(g.cursor, centre) : null;
+    const turning = !!toCursor && Math.hypot(...toCursor) > 1e-9;
+    const base = g?.ref ?? (turning ? unit(toCursor!) : levelIn(n).h);
+    const side = cross(n, base);
+    const sideSign = g?.ref && g.angle < 0 ? -1 : 1;
+    const at = (a: number, rr = r) => add(centre, add(mul(base, Math.cos(a) * rr), mul(side, sideSign * Math.sin(a) * rr)));
+    // A half protractor on its base line (the diameter through the vertex), ticks every 15
+    // degrees from the zero, longer every 45.
     const ring: V3[] = [];
-    for (let k = 0; k <= 24; k++) ring.push(at(from + sideSign * (k / 24) * span));
-    overlay.push({ kind: g?.ref ? ("strip" as const) : ("loop" as const), points: g?.ref ? ring : ring.slice(0, 24), color, width: 1.5 });
+    for (let k = 0; k <= 24; k++) ring.push(at((k / 24) * Math.PI));
+    overlay.push({ kind: "strip" as const, points: ring, color, width: 1.5 });
+    overlay.push({ kind: "segments" as const, points: [at(Math.PI), at(0)], color, width: 1.5 });
     const ticks: V3[] = [];
-    const n = g?.ref ? 13 : 24;
-    for (let k = 0; k < n; k++) {
-      const t = from + sideSign * k * TICK_DEG * DEG;
+    for (let k = 1; k < 12; k++) {
+      const t = k * TICK_DEG * DEG;
       ticks.push(at(t), at(t, r * (k % 3 === 0 ? 0.8 : 0.9)));
     }
     overlay.push({ kind: "segments" as const, points: ticks, color, width: 1 });
     const labels = [];
     if (g?.ref) {
-      overlay.push({ kind: "segments" as const, points: [centre, add(centre, mul(g.ref, r))], color: "--sel", width: 1.75 });
+      overlay.push({ kind: "segments" as const, points: [centre, add(centre, mul(g.ref, r * 1.3))], color: "--sel", width: 2 });
+      labels.push({ at: add(centre, mul(g.ref, r * 1.4)), text: "0°", className: "live" });
       if (Math.abs(g.angle) > 1e-9) {
         const d = rotate(g.ref, g.normal, g.angle);
         // The guide to be: long dashes across the view, like a placed guide.
@@ -228,8 +234,10 @@ export class ProtractorTool extends Tool {
         overlay.push({ kind: "strip" as const, points: arc, color: "--sel", width: 2 });
         labels.push({ at: add(centre, mul(d, r * 1.15)), text: fmtSlope(g.angle), className: "live" });
       }
-    } else if (g?.cursor) {
-      overlay.push({ kind: "segments" as const, points: [centre, g.cursor], color: "--sel", width: 1.25, dashed: true });
+    } else if (turning && g?.cursor) {
+      overlay.push({ kind: "segments" as const, points: [centre, g.cursor], color: "--sel", width: 1.75, dashed: true });
+      // What the reference is: its angle from the level (or from red on a level plane).
+      labels.push({ at: add(centre, mul(base, r * 1.15)), text: `ref ${fmtSlope(referenceAngle(base, n))}`, className: "live" });
     }
     return { ...EMPTY_VIEW, marker, overlay, labels };
   }
@@ -242,4 +250,21 @@ export class ProtractorTool extends Tool {
     const pxPerM = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]), Math.hypot(c2[0] - a[0], c2[1] - a[1])) / 0.1;
     return pxPerM > 1e-6 ? 56 / pxPerM : 0.1;
   }
+}
+
+/** E-20: a plane's level direction `h` (red on a level plane) and its rising one `v`. */
+export function levelIn(n: V3): { h: V3; v: V3 } {
+  const u = unit(n);
+  if (Math.abs(u[2]) > 1 - 1e-9) return { h: [1, 0, 0], v: [0, 1, 0] };
+  const h = unit(cross([0, 0, 1], u));
+  let v = unit(cross(u, h));
+  if (v[2] < 0) v = mul(v, -1);
+  return { h, v };
+}
+
+/** E-20: a reference line's angle (radians, 0..90 degrees) from its plane's level (on a
+ * level plane, from the red axis): a line, so whichever way along it. */
+export function referenceAngle(dir: V3, n: V3): number {
+  const { h, v } = levelIn(n);
+  return Math.atan2(Math.abs(dot(dir, v)), Math.abs(dot(dir, h)));
 }
