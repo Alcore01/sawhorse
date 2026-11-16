@@ -879,3 +879,34 @@ fn a_kind_switched_off_in_the_legend_never_snaps_and_the_next_one_takes_over() {
     q.disabled = vec![K::Grid];
     assert_eq!(run(&m, &q).kind, K::Free);
 }
+
+#[test]
+fn two_hovered_points_align_at_once() {
+    // sketchcraft E-21: level with one corner (along red) and plumb with another (along
+    // blue), on an upright plane (the Protractor's, square to green): the point where both
+    // alignments cross snaps, with both dotted lines, as SketchUp's double inference.
+    let m = model(&[]);
+    let mut q = side_x(0.0, 0.0, 0.001);
+    // Looking along +y at the plane y = 0 (x across, z up).
+    q.dir = [0.0, 1.0, 0.0];
+    q.px.forward = q.dir;
+    let at = |x: f64, z: f64| ([x, -10.0, z], [x, -10.0, z]);
+    let (o, e) = at(2.0 + 0.004, 1.5 - 0.003);
+    q.origin = o;
+    q.px.eye = e;
+    q.start = Some([0.0, 0.0, 0.5]);
+    q.plane = Some(PlaneQ {
+        origin: [0.0, 0.0, 0.0],
+        normal: [0.0, 1.0, 0.0],
+    });
+    q.anchors = vec![[0.3, 0.0, 1.5], [2.0, 0.0, 1.0]];
+    q.grid = false;
+    let r = run(&m, &q);
+    assert_eq!(r.kind, K::FromPoint, "{r:?}");
+    assert!(close(r.point, [2.0, 0.0, 1.5]), "{:?}", r.point);
+    assert_eq!(r.lines.len(), 2);
+    // Without a start too (before the first click of a tool).
+    q.start = None;
+    let r = run(&m, &q);
+    assert!(close(r.point, [2.0, 0.0, 1.5]), "{:?}", r.point);
+}
