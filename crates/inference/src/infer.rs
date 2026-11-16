@@ -615,7 +615,10 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
         if ctx.on_plane(DVec3::ZERO) {
             targets.extend(AXES.iter().map(|&d| (DVec3::ZERO, d)));
         }
-        for c in constraint.iter().filter(|c| c.kind != InferenceKind::FromPoint) {
+        for c in constraint
+            .iter()
+            .filter(|c| c.kind != InferenceKind::FromPoint)
+        {
             let d = (c.point - s).normalize_or_zero();
             if d == DVec3::ZERO {
                 continue;

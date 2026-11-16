@@ -321,3 +321,72 @@ fn draw_ops_round_trip_through_json() {
     );
     assert_eq!(serde_json::from_str::<Op>(&json).unwrap(), op);
 }
+
+/// sketchcraft E-19: a stroke that closes against an edge of another sketch lying on its
+/// plane (two upright rectangles sharing a vertical edge, drawn line by line).
+#[test]
+fn a_stroke_closes_into_a_face_against_another_sketchs_edge_on_its_plane() {
+    let mut m = Model::with_ground_sketch();
+    let up = |normal: [f64; 3], points: Vec<[f64; 3]>, closed: bool| Op::Draw {
+        target: DrawTarget::Plane {
+            origin: [0.0, 0.0, 0.0],
+            normal,
+        },
+        points,
+        closed,
+        curve: None,
+    };
+    // The first rectangle upright on y = 0: a face.
+    let out = m
+        .apply(&up(
+            [0.0, 1.0, 0.0],
+            vec![
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [1.0, 0.0, 1.0],
+                [0.0, 0.0, 1.0],
+            ],
+            true,
+        ))
+        .unwrap();
+    assert!(
+        matches!(out, OpOutcome::Drawn { ref regions, .. } if regions.len() == 1),
+        "{out:?}"
+    );
+    // The second upright on x = 0, from the shared edge's foot round to its top: three
+    // lines; the fourth side is the first rectangle's edge (0,0,0)-(0,0,1).
+    let out = m
+        .apply(&up(
+            [1.0, 0.0, 0.0],
+            vec![
+                [0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 1.0, 1.0],
+                [0.0, 0.0, 1.0],
+            ],
+            false,
+        ))
+        .unwrap();
+    let OpOutcome::Drawn {
+        sketch: Some(s2),
+        ref regions,
+        ..
+    } = out
+    else {
+        panic!("{out:?}")
+    };
+    assert_ne!(s2, 1);
+    assert_eq!(regions.len(), 1, "the second rectangle is a face: {out:?}");
+    // A stroke that only touches another sketch's edge at one end imports nothing.
+    let out = m
+        .apply(&up(
+            [1.0, 0.0, 0.0],
+            vec![[0.0, 0.0, 1.0], [0.0, -1.0, 2.0]],
+            false,
+        ))
+        .unwrap();
+    assert!(
+        matches!(out, OpOutcome::Drawn { ref regions, .. } if regions.is_empty()),
+        "{out:?}"
+    );
+}
