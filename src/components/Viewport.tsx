@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MeshData, MeshPart } from "../kernel/types";
 import type { Vec3 } from "../lib/edit";
-import { INFERENCE_STYLES, LEGEND_KINDS, type InferenceKind } from "../lib/inferenceStyle";
+import { INFERENCE_STYLES, LEGEND_KINDS, SNAP_SWITCHES, type InferenceKind } from "../lib/inferenceStyle";
 import { isMacControlClick } from "../lib/platform";
 import type { UnitSystem } from "../lib/units";
 import { NO_HIGHLIGHT, ViewportEngine, webgl2Available, type Highlight, type OverlayItem, type Projection, type ViewId } from "../viewport/engine";
@@ -78,6 +78,8 @@ export interface ViewportProps {
   onCamera?: (view: ViewId | null, projection: Projection) => void;
   /** The engine, once it exists (null when it goes away). */
   onEngine?: (engine: ViewportEngine | null) => void;
+  /** sketchcraft E-16: the legend as snapping switches (absent: the plain legend). */
+  snaps?: { on: (id: string) => boolean; toggle: (id: string) => void };
 }
 
 /** Read-only hooks for e2e tests and lane-end captures (scripts/capture*.mjs, e2e/*.spec.ts). */
@@ -328,14 +330,33 @@ export function Viewport(props: ViewportProps) {
           </div>
         </>
       ) : null}
-      <div className="legend">
-        {LEGEND_KINDS.map((k) => INFERENCE_STYLES[k]).map((s) => (
-          <span key={s.token}>
-            <i style={{ background: `var(${s.token})` }}></i>
-            {s.label}
+      {props.snaps ? (
+        // sketchcraft E-16: the legend is the snapping switches (click to turn one off).
+        <div className="legend snaps" role="group" aria-label="Snapping">
+          {SNAP_SWITCHES.map((s) => {
+            const on = props.snaps!.on(s.id);
+            return (
+              <button key={s.id} type="button" aria-pressed={on} className={on ? "on" : "off"} title={`${s.label}: ${on ? "on" : "off"} (click to switch)`} onClick={() => props.snaps!.toggle(s.id)}>
+                <i style={{ background: on ? `var(${s.token})` : "transparent", borderColor: `var(${s.token})` }}></i>
+                {s.label}
+              </button>
+            );
+          })}
+          <span>
+            <i style={{ background: `var(${INFERENCE_STYLES["on-face"].token})` }}></i>
+            {INFERENCE_STYLES["on-face"].label}
           </span>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="legend">
+          {LEGEND_KINDS.map((k) => INFERENCE_STYLES[k]).map((s) => (
+            <span key={s.token}>
+              <i style={{ background: `var(${s.token})` }}></i>
+              {s.label}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="axes">x ─ red · y ─ green · z ─ blue</div>
     </main>
   );

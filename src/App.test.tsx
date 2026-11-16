@@ -131,6 +131,24 @@ describe("App shell", () => {
     localStorage.removeItem("sketchcraft.snapToGrid");
   });
 
+  it("the legend's snapping switches turn kinds off and on, and are remembered (sketchcraft E-16)", async () => {
+    localStorage.removeItem("sketchcraft.snapOff");
+    render(<App />);
+    const mid = () => screen.getByRole("button", { name: "Midpoint" });
+    expect(mid().getAttribute("aria-pressed")).toBe("true");
+    await act(async () => {
+      fireEvent.click(mid());
+    });
+    expect(mid().getAttribute("aria-pressed")).toBe("false");
+    expect(JSON.parse(localStorage.getItem("sketchcraft.snapOff") ?? "[]")).toEqual(["midpoint"]);
+    // Grid in the legend is View > Snap to Grid (off by default).
+    expect(screen.getByRole("button", { name: "Grid" }).getAttribute("aria-pressed")).toBe("false");
+    cleanup();
+    render(<App />);
+    expect(mid().getAttribute("aria-pressed")).toBe("false");
+    localStorage.removeItem("sketchcraft.snapOff");
+  });
+
   it("an Alt tap is a press and release with nothing between: Alt held for an Alt+drag is not one (lane 30)", async () => {
     render(<App />);
     const hint = () => document.getElementById("hint")?.textContent ?? "";

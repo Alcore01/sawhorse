@@ -59,6 +59,7 @@ fn down(x: f64, y: f64, mpp: f64) -> InferQuery {
         point_px: 10.0,
         line_px: 7.0,
         soft: false,
+        disabled: vec![],
     }
 }
 
@@ -841,5 +842,40 @@ fn far_from_the_start_the_axis_holds_within_a_few_degrees() {
     let mut q = down(0.1, 0.012, 0.001);
     q.start = Some([0.0, 0.0, 0.0]);
     q.grid = false;
+    assert_eq!(run(&m, &q).kind, K::Free);
+}
+
+#[test]
+fn a_kind_switched_off_in_the_legend_never_snaps_and_the_next_one_takes_over() {
+    // sketchcraft E-16. The box's ground corner (1, 1, 0): an endpoint...
+    let m = model(&[rect(0.0, 0.0, 1.0, 1.0)]);
+    let mut q = down(1.003, 1.002, 0.001);
+    q.grid = false;
+    assert_eq!(run(&m, &q).kind, K::Endpoint);
+    // ...endpoints off: the edge under the cursor takes over.
+    q.disabled = vec![K::Endpoint];
+    let r = run(&m, &q);
+    assert_eq!(r.kind, K::OnEdge, "{r:?}");
+    // Edges off too: nothing but the surface (a region on the ground).
+    q.disabled = vec![K::Endpoint, K::OnEdge, K::Midpoint];
+    assert!(matches!(run(&m, &q).kind, K::OnFace | K::Free));
+    // Axes off: a line from the start no longer holds red, nor the model's own red axis.
+    let m = model(&[]);
+    let mut q = down(2.0, 0.003, 0.001);
+    q.start = Some([0.0, 0.0, 0.0]);
+    q.grid = false;
+    assert_eq!(run(&m, &q).kind, K::AxisX);
+    q.disabled = vec![K::AxisX, K::AxisY, K::AxisZ];
+    assert_eq!(run(&m, &q).kind, K::Free);
+    // ...but a lock (the right arrow) still holds it.
+    q.lock = Some(LockQ {
+        dir: [1.0, 0.0, 0.0],
+        kind: K::AxisX,
+    });
+    assert_eq!(run(&m, &q).kind, K::AxisX);
+    // Grid off in the list: no grid point, no grid-step length.
+    let mut q = down(3.0 * IN + 0.001, 5.0 * IN - 0.002, 0.001);
+    assert_eq!(run(&m, &q).kind, K::Grid);
+    q.disabled = vec![K::Grid];
     assert_eq!(run(&m, &q).kind, K::Free);
 }

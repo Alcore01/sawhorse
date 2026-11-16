@@ -33,3 +33,23 @@ describe("Snap to Grid", () => {
     expect(seen.map((q) => q.grid)).toEqual([true, false]);
   });
 });
+
+describe("Legend switches (sketchcraft E-16)", () => {
+  it("switched-off kinds go to the inference query; Grid stays Snap to Grid's", async () => {
+    const { disabledKinds } = await import("../lib/inferenceStyle");
+    expect(disabledKinds(["axes", "grid", "endpoint"])).toEqual(["endpoint", "axis-x", "axis-y", "axis-z"]);
+    const seen: InferQuery[] = [];
+    const kernel = { infer: async (q: InferQuery) => (seen.push(q), null) } as unknown as KernelClient;
+    const engine = {
+      ray: () => ({ origin: [0, 0, 10], dir: [0, 0, -1] }),
+      pixelScale: () => ({ ortho: true, scale: 0.001, eye: [0, 0, 10], forward: [0, 0, -1] }),
+    } as unknown as ViewportEngine;
+    let off: string[] = [];
+    const resolve = kernelResolver(() => kernel, () => engine, () => [0.01, 0.1], undefined, undefined, () => false, () => disabledKinds(off));
+    await resolve(0, 0, {}, M);
+    off = ["midpoint"];
+    await resolve(0, 0, {}, M);
+    expect(seen[0].disabled).toBeUndefined();
+    expect(seen[1].disabled).toEqual(["midpoint"]);
+  });
+});

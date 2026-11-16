@@ -49,6 +49,9 @@ export interface NavHost {
    * again when Shift goes down or up mid-drag, with Alt as it was at the press. `macControl`:
    * the press is a Control+click on macOS, the Mac's right click. */
   leftButton?(mods: { alt: boolean; shift: boolean; macControl?: boolean }): "orbit" | "pan" | null;
+  /** sketchcraft E-17: orbit about the look-at point instead of the point under the cursor
+   * (while a tool's gesture is under way: the cursor is on the point being built). */
+  orbitAboutView?(): boolean;
 }
 
 type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera;
@@ -204,7 +207,9 @@ export class CameraController {
 
   /** The pivot an orbit turns about at pixel (x, y): what is under it, else the look-at point. */
   private pivotAt(x: number, y: number): Vec3 {
-    return this.host.pick(x, y, true) ?? [this.target.x, this.target.y, this.target.z];
+    const view: Vec3 = [this.target.x, this.target.y, this.target.z];
+    if (this.host.orbitAboutView?.()) return view;
+    return this.host.pick(x, y, true) ?? view;
   }
 
   private start(mode: NavMode, e: PointerEvent, x: number, y: number, mask: number): void {

@@ -63,3 +63,23 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non (préférence gardée dans le navigateur).
 - Vérification : 3 tests neufs (l'interrupteur arrêté envoie `grid: false` même à un outil qui demande la grille ; en marche, chaque outil garde son choix ; le menu est arrêté par défaut, bascule et se souvient après rechargement), qui échouent sans le changement ; un premier essai a montré que le menu, mis en cache, ne se rafraîchissait pas : dépendance ajoutée. Suite complète : 891 passés (888 + 3), 253 ignorés, aucun échec. Niveau : testé ; essai dans le navigateur par JC à faire.
 - Limites connues : pas de raccourci clavier pour l'interrupteur.
+
+## H-20261116-5 · évolution · module|interface · Accrochages activables dans la légende (E-16) ; orbite pendant un tracé (E-17)
+
+- Origine : JC, 16 nov. 2026, 14 h 04 : « d'une manière générale dans cette partie de l'écran . des accrochages activables et désactivables. » ; « j'ai aussi un autre soucis , si je crée une ligne et qu'avant de l'avoir terminée je fait une rotation de la vue cette rotation utilise le point en train d'étre construit . dans sketchup ce n'est pas du tout le cas » ; E-16, E-17.
+- Constat (E-17) : `src/viewport/controls.ts` prend pour pivot de l'orbite le point sous le curseur ; pendant un tracé, le curseur est sur le point en construction, qui devenait le pivot.
+- Fichiers :
+  - `crates/inference/src/infer.rs` : `InferQuery.disabled` (types coupés) ; leurs candidats (points, lignes, lignes partant du départ, croisements, grille, arrondi des longueurs) sont écartés avant le choix ; un verrou (flèches, Maj) garde sa ligne. Tests : `tests/infer.rs` (1 test neuf ; champ ajouté à 3 requêtes de test : `infer.rs`, `perf.rs`, `sections.rs`).
+  - `src/lib/inferenceStyle.ts` : les interrupteurs (`SNAP_SWITCHES` : Endpoint, Midpoint, On Edge, Intersection, Centre, Axes, Parallel / Perp., From Point, Guides, Grid) et `disabledKinds`.
+  - `src/kernel/types.ts` : le champ `disabled` de la requête ; `src/tools/driver.ts` : il est transmis.
+  - `src/components/Viewport.tsx`, `src/styles/app.css` : la légende devient une rangée de boutons (barré et atténué quand coupé) ; On Face reste affiché, sans bouton.
+  - `src/App.tsx` : l'état des interrupteurs (préférence du navigateur, clé `sketchcraft.snapOff`) ; Grid = Snap to Grid ; l'orbite pendant un geste.
+  - `src/viewport/controls.ts`, `src/viewport/engine.ts` : `orbitAboutView` : pendant un geste d'outil, le pivot de l'orbite est le point visé de la vue.
+  - Tests : `src/tools/driver-grid.test.ts` (1), `src/App.test.tsx` (1), `src/viewport/controls.test.ts` (1).
+- Évolution : (E-16) un clic sur un type d'accrochage dans la légende le coupe ou le rétablit ; le message le dit ; le choix se garde d'une visite à l'autre. (E-17) pendant un tracé (une ligne commencée, un rectangle…), le bouton du milieu tourne la vue autour de son point visé, comme SketchUp ; hors geste, rien ne change (le point sous le curseur).
+- Écarté : un interrupteur pour On Face (on ne pourrait plus dessiner sur une face) ; garder les choix dans le modèle (préférence de travail).
+- Effet sur les résultats : aucun quand tout est actif (les requêtes sans `disabled` sont inchangées).
+- Effet sur les projets existants : aucun ; pas de changement de format. Il faut recompiler le noyau (`npm run wasm`).
+- Confidentialité : non.
+- Vérification : 4 tests neufs, échouant sans le changement : noyau (point coupé → l'arête prend la main ; axes coupés mais verrou tenu ; grille coupée) ; requête (les types coupés partent au noyau) ; légende (bascule et mémoire) ; orbite (pivot = point visé pendant un geste, point sous le curseur sinon). Rust : 698 passés (697 + 1), 3 ignorés ; TypeScript : 894 passés (891 + 3), 253 ignorés ; aucun échec. Niveau : testé ; essai dans le navigateur par JC à faire.
+- Limites connues : le pivot « point visé » est celui de la vue, pas le centre du modèle ; pas de raccourcis clavier pour les interrupteurs.

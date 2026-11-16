@@ -92,6 +92,10 @@ pub struct InferQuery {
     /// Ctrl+Shift, to unsoften).
     #[serde(default)]
     pub soft: bool,
+    /// sketchcraft E-16: kinds switched off in the legend (never snapped to; the next kind
+    /// down takes over). A lock (arrow keys, Shift) still holds its line.
+    #[serde(default)]
+    pub disabled: Vec<InferenceKind>,
 }
 
 /// A line the UI draws for an inference (the axis from the start, the dotted alignment
@@ -442,7 +446,11 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
             }
         }
     }
-    let points: Vec<Cand> = points.into_iter().filter(|c| c.px <= q.point_px).collect();
+    let off = |k: InferenceKind| q.disabled.contains(&k);
+    let points: Vec<Cand> = points
+        .into_iter()
+        .filter(|c| c.px <= q.point_px && !off(c.kind))
+        .collect();
     let best_point = best(points);
 
     // ---- lines -------------------------------------------------------------------------
@@ -562,6 +570,8 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
             }
         }
     }
+    lines.retain(|c| !off(c.kind));
+    constraint.retain(|c| !off(c.kind));
     // An axis line that crosses a nearby edge snaps to the crossing (still on the axis).
     let mut crossings: Vec<Cand> = Vec::new();
     for c in &constraint {
@@ -630,6 +640,7 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
             }
         }
     }
+    crossings.retain(|c| !off(c.kind));
     let line_best = best(crossings).or_else(|| best(lines.into_iter().chain(constraint).collect()));
 
     // ---- surface, plane, grid ------------------------------------------------------------
@@ -685,6 +696,7 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
     };
     let grid_cand = |c: &Cand| -> Option<Cand> {
         if !q.grid
+            || off(InferenceKind::Grid)
             || c.point.z.abs() > 1e-9
             || ctx.plane.is_some_and(|(_, n)| n.z.abs() < 1.0 - 1e-9)
         {
@@ -848,7 +860,7 @@ fn start_line_px(q: &InferQuery, ctx: &Ctx, s: DVec3, p: DVec3) -> f64 {
 /// that point is still within the line tolerance on screen, so lengths drawn by mouse
 /// along an axis come out exact.
 fn snap_length(q: &InferQuery, ctx: &Ctx, s: DVec3, d: DVec3, p: DVec3) -> Option<(DVec3, f64)> {
-    if !q.grid {
+    if !q.grid || q.disabled.contains(&InferenceKind::Grid) {
         return None;
     }
     let [minor, major] = q.grid_step.unwrap_or([0.0254, 0.3048]);
