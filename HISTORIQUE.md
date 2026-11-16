@@ -158,3 +158,17 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 2 tests neufs (angle d'une référence, dans les deux sens, à plat ; affichage pendant le choix de la référence : base du demi-rapporteur dans la direction du curseur, étiquette « ref 37° (75.4%) », puis « 0° » sur la référence), qui échouent sans le changement ; suite complète : 899 passés (897 + 2), 253 ignorés, aucun échec. Niveau : testé ; essai dans le navigateur par JC à faire.
 - Limites connues : l'angle de la référence est donné sans signe (0 à 90°) ; pas d'accrochage de la référence aux graduations (seulement aux arêtes, axes et lignes).
+
+## H-20261116-11 · évolution · module · Accrochage à double référence (E-21)
+
+- Origine : JC, 16 nov. 2026, 15 h 59 : « il manque aussi l’accrochage a la double références comme dans cet exemple », avec deux captures du rapporteur (alignement « From Point » horizontal sur le coin haut gauche, puis vertical sur le coin haut droit, jamais les deux) ; E-21.
+- Constat : `crates/inference/src/infer.rs` ne croisait l'alignement d'un point survolé qu'avec les lignes partant du départ du geste, pas avec l'alignement d'un second point survolé.
+- Fichiers :
+  - `crates/inference/src/infer.rs` : pour chaque paire de points survolés (les deux derniers, `InferenceMemory.MAX_ANCHORS`), le croisement d'une ligne d'axe par l'un et d'une ligne d'axe par l'autre (dans le plan de dessin s'il y en a un) est un point « From Point », avec les deux pointillés.
+  - `crates/inference/tests/infer.rs` : 1 test (sur le plan vertical du rapporteur, avec et sans point de départ).
+- Évolution : comme dans SketchUp, survoler un coin puis un autre, puis aller vers la croisée de leurs alignements : le point s'y accroche.
+- Effet sur les résultats : un point d'accrochage de plus près des croisées d'alignements ; coupé avec « From Point » dans la légende.
+- Effet sur les projets existants : aucun ; pas de changement de format. Il faut recompiler le noyau (`npm run wasm`).
+- Confidentialité : non.
+- Vérification : le test neuf échoue sans le changement (point à un seul alignement) et passe ; `cargo test --workspace` : 702 passés (701 + 1), 3 ignorés, aucun échec. Niveau : testé (noyau) ; essai dans le navigateur par JC à faire.
+- Limites connues : seulement les deux derniers points survolés, et seulement les axes (pas le parallèle à une arête).

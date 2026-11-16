@@ -443,6 +443,35 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
             }
         }
     }
+    // sketchcraft E-21: two hovered points at once: an axis line through one meets an axis
+    // line through the other (level with one corner and plumb with another).
+    for (i, &a1) in anchors.iter().enumerate() {
+        for &a2 in &anchors[i + 1..] {
+            for &d1 in &AXES {
+                for &d2 in &AXES {
+                    if !ctx.in_plane(d1) || !ctx.in_plane(d2) || d1.cross(d2).length() < 1e-9 {
+                        continue;
+                    }
+                    let Some((u, v)) = line_line(a1, d1, a2, d2) else {
+                        continue;
+                    };
+                    let (p, r) = (a1 + d1 * u, a2 + d2 * v);
+                    if p.distance(r) > 1e-9 * (1.0 + p.length()) || u.abs() < 1e-9 || v.abs() < 1e-9
+                    {
+                        continue;
+                    }
+                    if let Some(mut c) = ctx.point(InferenceKind::FromPoint, p, None) {
+                        c.kind = InferenceKind::FromPoint;
+                        c.lines = vec![
+                            line(a1, p, InferenceKind::FromPoint),
+                            line(a2, p, InferenceKind::FromPoint),
+                        ];
+                        points.push(c);
+                    }
+                }
+            }
+        }
+    }
     let off = |k: InferenceKind| q.disabled.contains(&k);
     let points: Vec<Cand> = points
         .into_iter()
