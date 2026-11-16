@@ -1,5 +1,7 @@
-// Erase (E). Click an edge, a line drawn on a face, an imprinted face or a sketch region to
-// erase it; drag across several edges to erase them all at once (one undo step). The
+// Erase (E). Click an edge (or a line drawn on a face) to erase it; drag across several
+// edges to erase them all at once (one undo step). sketchcraft E-23: as in SketchUp, the
+// Eraser takes edges only, never a face or a sketch region: those are removed with Select
+// and Delete (a face goes with its edges when they are erased, as before). The
 // kernel validates every erase: a solid stays closed, so its structural edges and faces are
 // refused with the reason in the status line.
 //
@@ -17,6 +19,9 @@ import { curveOf, curveSegments } from "../lib/curves";
 import { edgeFlagWords, entityKey, eraseOp, eraseOps } from "../lib/entities";
 import { scopeEntity } from "../lib/scope";
 import { EMPTY_VIEW, Tool, type InferContext, type ToolEvent, type ToolView } from "./tool";
+
+/** E-23: what a click on a face or a region says. */
+export const FACE_HINT = "The Eraser takes edges. To remove a face, select it (Space) and press Delete.";
 
 /** Soft (1), smooth (2) and hidden (4), as crates/kernel/src/edges.rs counts them. */
 const SOFT = 1;
@@ -79,7 +84,7 @@ export class EraseTool extends Tool {
     const mode = edgeMode(e);
     switch (e.type) {
       case "move": {
-        h.hover(ent && ent.kind !== "vertex" && (!mode || ent.kind === "edge" || ent.kind === "curve") ? ent : null);
+        h.hover(ent && (ent.kind === "edge" || ent.kind === "curve") ? ent : null);
         // The edge's tooltip (lane 15): what it is now, so the modifier's effect is plain.
         const words = edge?.kind === "edge" ? edgeFlagWords(edge.flags) : "";
         if (words !== this.said) {
@@ -100,7 +105,12 @@ export class EraseTool extends Tool {
           void this.flag([ent], mode);
           return;
         }
-        // A whole solid is deleted with Select + Delete, never by a stray eraser click.
+        // E-23: faces, regions and whole solids are removed with Select + Delete, never by an
+        // eraser click.
+        if (ent.kind === "face" || ent.kind === "region") {
+          h.status(FACE_HINT, false);
+          return;
+        }
         const op = eraseOp(ent, h.state());
         if (typeof op === "string") {
           h.status(op, true);
@@ -111,7 +121,7 @@ export class EraseTool extends Tool {
       }
       case "drag":
         this.dragging = true;
-        if (ent && (ent.kind === "edge" || ent.kind === "curve" || (!mode && ent.kind === "region"))) this.swept.set(entityKey(ent), ent);
+        if (ent && (ent.kind === "edge" || ent.kind === "curve")) this.swept.set(entityKey(ent), ent);
         h.hover(ent);
         h.changed();
         return;

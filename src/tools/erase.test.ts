@@ -83,3 +83,25 @@ describe("Eraser modifiers", () => {
     expect(edgeFlagWords(0)).toBe("");
   });
 });
+
+describe("Eraser takes edges only (sketchcraft E-23)", () => {
+  it("a click or a drag on a face or a sketch region erases nothing and says to use Select + Delete", async () => {
+    const { FACE_HINT } = await import("./erase");
+    const h = fakeHost();
+    const t = new EraseTool(h);
+    const region: Entity = { kind: "region", sketch: 2, region: 1 } as Entity;
+    const face: Entity = { kind: "face", object: 3, face: 5 } as Entity;
+    for (const ent of [region, face]) {
+      t.onEvent(ev("click", [0, 0, 0], { picked: picked(ent) }));
+      expect(h.statuses.at(-1)?.text).toBe(FACE_HINT);
+    }
+    t.onEvent(ev("drag", [0, 0, 0], { picked: picked(region) }));
+    t.onEvent(ev("dragend", [0, 0, 0], { picked: picked(region) }));
+    await Promise.resolve();
+    expect(h.ops).toHaveLength(0);
+    // An edge still erases.
+    t.onEvent(ev("click", [0, 0, 0], { picked: picked(E1) }));
+    await Promise.resolve();
+    expect(h.ops).toHaveLength(1);
+  });
+});
