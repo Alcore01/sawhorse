@@ -48,6 +48,8 @@ export const TOOL_GLYPHS: Record<BuiltinToolId, ReactElement> = {
     </>
   ),
   tape: <path d="M3 15l12-12 6 6-12 12z M7 11l2 2M10 8l2 2M13 5l2 2" />,
+  // sketchcraft E-01: a half protractor on its base line, with its needle.
+  protractor: <path d="M3 18h18 M3 18a9 9 0 0 1 18 0 M12 18l5-7 M7 18a5 5 0 0 1 10 0" />,
   dim: <path d="M3 12h18M3 8v8M21 8v8" />,
   paint: <path d="M4 20c0-3 2-5 5-5l6-9 4 4-9 6c0 3-2 5-6 4z M12 8l4 4" />,
   // Lane 12: a plane seen at an angle, with the arrows that show the side it keeps.

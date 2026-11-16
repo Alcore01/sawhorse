@@ -5,7 +5,7 @@ export type BuiltinToolId =
   | "select" | "erase"
   | "line" | "rect" | "circle" | "arc"
   | "pushpull" | "move" | "rotate" | "scale" | "offset" | "follow"
-  | "tape" | "dim" | "paint"
+  | "tape" | "protractor" | "dim" | "paint"
   | "section"
   | "orbit" | "pan";
 
@@ -52,6 +52,8 @@ export const TOOL_GROUPS: ToolDef[][] = [
   ],
   [
     { id: "tape", label: "Tape", key: "t", keyCap: "T", hint: "Click two points to measure. Click an edge and move for a guide.", vcb: "Length" },
+    // sketchcraft E-01: no default key (SketchUp 2017 had none either); Tools > Protractor.
+    { id: "protractor", label: "Protr.", key: "", keyCap: "", hint: "Click the vertex, then along the reference line, then where the guide goes. Type 35, 70% or 1:2.", vcb: "Angle" },
     { id: "dim", label: "Dim", key: "d", keyCap: "D", hint: "Click two points, then place the dimension line.", vcb: null },
     { id: "paint", label: "Paint", key: "b", keyCap: "B", hint: "Click a face to paint the active material. Alt+click picks one up; press O to orbit.", vcb: null },
   ],

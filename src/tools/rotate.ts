@@ -30,7 +30,7 @@ const DEG = Math.PI / 180;
 export const TICK_DEG = 15;
 export const SNAP_DEG = 3;
 
-const AXIS_KEYS: Record<string, { n: V3; name: string; kind: "axis-x" | "axis-y" | "axis-z" }> = {
+export const AXIS_KEYS: Record<string, { n: V3; name: string; kind: "axis-x" | "axis-y" | "axis-z" }> = {
   ArrowRight: { n: [1, 0, 0], name: "upright, facing red", kind: "axis-x" },
   ArrowLeft: { n: [0, 1, 0], name: "upright, facing green", kind: "axis-y" },
   ArrowUp: { n: [0, 0, 1], name: "level", kind: "axis-z" },
@@ -65,7 +65,7 @@ export function parseAngle(text: string): number | null {
 }
 
 /** "the blue axis", "the red axis", or "an axis across the face". */
-function axisWords(n: V3): string {
+export function axisWords(n: V3): string {
   const a = n.map(Math.abs);
   if (a[0] > 1 - 1e-9) return "the red axis";
   if (a[1] > 1 - 1e-9) return "the green axis";
@@ -401,7 +401,7 @@ export class RotateTool extends Tool {
 }
 
 /** Rodrigues: `v` turned by `a` about unit `n`. */
-function rotate(v: V3, n: V3, a: number): V3 {
+export function rotate(v: V3, n: V3, a: number): V3 {
   const c = Math.cos(a);
   const s = Math.sin(a);
   const k = dot(n, v) * (1 - c);
