@@ -129,3 +129,17 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : le test neuf échoue avec le noyau de H-20261116-7 et passe ; le test de H-20261116-7 passe toujours ; `cargo test --workspace` : 700 passés (699 + 1), 3 ignorés, aucun échec (dont le fuzzer de séquences et les empreintes « golden »). Niveau : testé (noyau) ; essai dans le navigateur par JC à faire.
 - Limites connues : seules les esquisses sont partagées, pas les faces des volumes poussés ; si plusieurs plans conviennent pour une ligne, le premier trouvé l'emporte.
+
+## H-20261116-9 · correction · module · Une ligne qui ferme deux contours crée les deux faces (E-19)
+
+- Origine : JC, 16 nov. 2026, 15 h 21 : « la dernière face est complète mais elle  ne se ferme pas » ; E-19 ; suite de H-20261116-8.
+- Constat : la dernière ligne de la boîte (le haut de la façade) fermait le toit sur son plan ; la recherche d'autres plans (H-20261116-8) ne se faisait que si rien ne se fermait sur le plan du tracé : la façade, fermée elle aussi par cette ligne, restait sans face. Reproduit par un test, qui échoue avec le noyau de H-20261116-8.
+- Fichiers :
+  - `crates/kernel/src/model.rs` : `close_on_other_planes` (ex-`close_on_another_plane`) essaie tous les plans passant par une ligne droite et une arête qui la touche, et la trace dans chacun où elle ferme un contour ; si elle ne ferme rien sur son propre plan, elle en est retirée (comme avant).
+  - `crates/kernel/tests/draw.rs` : 1 test (le haut de la façade ferme le toit et la façade).
+- Correction : comme dans SketchUp, une arête qui ferme deux contours crée les deux faces.
+- Effet sur les résultats : une telle ligne existe désormais dans l'esquisse de chaque face qu'elle ferme.
+- Effet sur les projets existants : aucun à l'ouverture ; une façade déjà tracée sans face se remplit en retraçant une de ses arêtes (la ligne retracée ne ferme rien sur son plan et va sur celui de la façade). Il faut recompiler le noyau (`npm run wasm`).
+- Confidentialité : non.
+- Vérification : le test neuf échoue avec le noyau de H-20261116-8 et passe ; `cargo test --workspace` : 701 passés (700 + 1), 3 ignorés, aucun échec. Niveau : testé (noyau) ; essai dans le navigateur par JC à faire.
+- Limites connues : celles de H-20261116-8 (pas de partage avec les volumes poussés).
