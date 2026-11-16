@@ -139,6 +139,7 @@ fn the_cut_corners_snap_and_the_removed_edges_do_not() {
         point_px: 10.0,
         line_px: 7.0,
         soft: false,
+        disabled: vec![],
     };
     let r = infer(&s, &q).unwrap();
     assert_eq!(r.kind, K::Endpoint);

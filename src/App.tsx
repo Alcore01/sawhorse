@@ -53,6 +53,7 @@ import { CircleTool } from "./tools/circle";
 import { ArcTool } from "./tools/arc";
 import { DimensionTool, TapeTool } from "./tools/tape";
 import { ProtractorTool } from "./tools/protractor";
+import { SNAP_SWITCHES, disabledKinds } from "./lib/inferenceStyle";
 import { annotationView } from "./lib/annotations";
 import { InferenceMemory, kernelResolver, ToolDriver } from "./tools/driver";
 import { friendlyError, setNameSource } from "./lib/names";
@@ -178,6 +179,17 @@ function loadSnapGrid(): boolean {
     return localStorage.getItem(SNAP_GRID_KEY) === "1";
   } catch {
     return false;
+  }
+}
+
+/** sketchcraft E-16: the legend's snapping switches turned off, per viewer. */
+const SNAP_OFF_KEY = "sketchcraft.snapOff";
+function loadSnapOff(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(SNAP_OFF_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
   }
 }
 
@@ -422,6 +434,19 @@ export function App() {
   const [snapGrid, setSnapGrid] = useState<boolean>(loadSnapGrid);
   const snapGridRef = useRef(snapGrid);
   snapGridRef.current = snapGrid;
+  const [snapOff, setSnapOff] = useState<string[]>(loadSnapOff);
+  const snapOffRef = useRef(snapOff);
+  snapOffRef.current = snapOff;
+  const toggleSnapGrid = useCallback(() => {
+    const next = !snapGridRef.current;
+    setSnapGrid(next);
+    try {
+      localStorage.setItem(SNAP_GRID_KEY, next ? "1" : "0");
+    } catch {
+      // A per-viewer convenience: without storage it lasts this visit.
+    }
+    return next;
+  }, []);
   const [fitSeq, setFitSeq] = useState(0);
   const [camView, setCamView] = useState<ViewId | null>("iso");
   const setView = useCallback((v: ViewId) => {
@@ -1441,6 +1466,7 @@ export function App() {
           };
         },
         () => snapGridRef.current,
+        () => disabledKinds(snapOffRef.current),
       ),
       () => activeRef.current ?? (toolsRef.current!.get("select") as Tool),
     );
@@ -2897,13 +2923,7 @@ export function App() {
           checked: snapGrid,
           title: "Snap to the ground grid's points, and round lengths drawn with the mouse to grid steps (off: as SketchUp; typed values are exact either way)",
           onSelect: () => {
-            const next = !snapGrid;
-            setSnapGrid(next);
-            try {
-              localStorage.setItem(SNAP_GRID_KEY, next ? "1" : "0");
-            } catch {
-              // A per-viewer convenience: without storage it lasts this visit.
-            }
+            const next = toggleSnapGrid();
             setMessage({ text: next ? "Snap to Grid on: grid points and grid-step lengths." : "Snap to Grid off: points, edges, axes and guides still snap.", error: false });
           },
         },
@@ -2947,7 +2967,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;
@@ -3085,10 +3105,32 @@ export function App() {
           setCamView(v);
           setProjection(p);
         }}
+        snaps={{
+          on: (id) => (id === "grid" ? snapGrid : !snapOff.includes(id)),
+          toggle: (id) => {
+            if (id === "grid") {
+              const next = toggleSnapGrid();
+              setMessage({ text: next ? "Snap to Grid on." : "Snap to Grid off.", error: false });
+              return;
+            }
+            const next = snapOff.includes(id) ? snapOff.filter((x) => x !== id) : [...snapOff, id];
+            setSnapOff(next);
+            try {
+              localStorage.setItem(SNAP_OFF_KEY, JSON.stringify(next));
+            } catch {
+              // Lasts this visit.
+            }
+            const label = SNAP_SWITCHES.find((s) => s.id === id)?.label ?? id;
+            setMessage({ text: `${label} snapping ${next.includes(id) ? "off" : "on"}.`, error: false });
+          },
+        }}
         onEngine={(e) => {
           engineRef.current = e;
           // Lane 30: the Orbit and Pan tools, and Alt+drag where the tool gives Alt no meaning.
           e?.setLeftButton((mods) => leftButtonNav(activeRef.current, mods));
+          // sketchcraft E-17: mid-gesture (a line being drawn), an orbit turns about the view's
+          // look-at point, not about the point being built under the cursor (as SketchUp).
+          e?.setOrbitAboutView(() => activeRef.current?.busy() ?? false);
           setEngineObj(e);
         }}
       />

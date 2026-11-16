@@ -168,6 +168,7 @@ fn time(name: &str, m: &Model) {
                     point_px: 10.0,
                     line_px: 7.0,
                     soft: false,
+                    disabled: vec![],
                 };
                 let t = Instant::now();
                 std::hint::black_box(infer(&scene, &q));

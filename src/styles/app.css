@@ -149,6 +149,13 @@ textarea{width:100%;min-height:54px;resize:vertical;border:1px solid var(--line)
 .menu button[aria-expanded="true"]{background:var(--rail);color:var(--fg)}
 /* Viewport overlays never swallow pointer events meant for the canvas (window selection can start under them). */
 .vp .hud,.vp .legend,.vp .axes{pointer-events:none}
+/* sketchcraft E-16: the legend's snapping switches */
+.vp .legend.snaps{pointer-events:auto;gap:4px}
+.legend.snaps button{font:inherit;color:inherit;background:transparent;border:1px solid transparent;border-radius:3px;padding:1px 5px;cursor:pointer}
+.legend.snaps button:hover{border-color:var(--line,#ccc)}
+.legend.snaps button.off{opacity:.55;text-decoration:line-through}
+.legend.snaps i{border:1.5px solid transparent;box-sizing:border-box}
+.legend.snaps span{padding:1px 5px}
 
 /* ---- Lane 4 additions: status-line actions ("Restore unsaved work?") ---- */
 .vcb .hint .hint-action{margin-left:8px;padding:1px 8px;border:1px solid var(--accent);border-radius:4px;color:var(--accent);background:var(--bg);font:12px var(--body)}

@@ -424,3 +424,24 @@ describe("update", () => {
     expect(fwd.dot(ctl.target.clone().sub(cam.position).normalize())).toBeCloseTo(1, 12);
   });
 });
+
+describe("orbit mid-gesture (sketchcraft E-17)", () => {
+  it("while a tool's gesture is under way, a middle-drag orbits about the look-at point, not the point under the cursor", () => {
+    ctl.dispose();
+    canvas.remove();
+    setup();
+    let busy = true;
+    ctl.dispose();
+    ctl = new CameraController(cam, canvas, { pick: (x, y) => hitAt(cam, x, y), size: () => ({ w: W, h: H }), navigating, orbitAboutView: () => busy });
+    ctl.target.set(0.2, 0.2, 0.1);
+    const at: [number, number] = [470, 260];
+    pointer(canvas, "pointerdown", { x: at[0], y: at[1], button: 1, buttons: 4 });
+    expect(ctl.state().pivot).toEqual([0.2, 0.2, 0.1]);
+    pointer(canvas, "pointerup", { x: at[0], y: at[1], button: 1 });
+    // No gesture: the point under the cursor again.
+    busy = false;
+    pointer(canvas, "pointerdown", { x: at[0], y: at[1], button: 1, buttons: 4 });
+    expect(ctl.state().pivot).toEqual(hitAt(cam, ...at));
+    pointer(canvas, "pointerup", { x: at[0], y: at[1], button: 1 });
+  });
+});

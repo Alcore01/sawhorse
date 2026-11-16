@@ -342,6 +342,7 @@ export class ViewportEngine {
       size: () => this.size,
       navigating: () => this.requestRender(),
       leftButton: (mods) => this.leftButton?.(mods) ?? null,
+      orbitAboutView: () => this.orbitAboutView?.() ?? false,
     });
     this.controls.onChange(() => {
       // Any orbit leaves the standard view; a pure zoom or pan keeps the direction.
@@ -1888,6 +1889,12 @@ varying float vOwnerState;`,
    * (the app: the Orbit and Pan tools, and Alt+drag where the tool gives Alt no meaning). */
   setLeftButton(fn: ((mods: { alt: boolean; shift: boolean; macControl?: boolean }) => "orbit" | "pan" | null) | null): void {
     this.leftButton = fn;
+  }
+
+  /** sketchcraft E-17: when true, an orbit turns about the look-at point (see controls). */
+  private orbitAboutView: (() => boolean) | null = null;
+  setOrbitAboutView(fn: (() => boolean) | null): void {
+    this.orbitAboutView = fn;
   }
 
   /** What navigation is doing (lane 21): the gesture, and the pivot while orbiting (the

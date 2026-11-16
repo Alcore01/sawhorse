@@ -725,6 +725,8 @@ export interface InferQuery {
   grid_step?: [number, number];
   point_px?: number;
   line_px?: number;
+  /** sketchcraft E-16: kinds switched off in the legend. */
+  disabled?: import("../lib/inferenceStyle").InferenceKind[];
 }
 
 export interface PickQuery {

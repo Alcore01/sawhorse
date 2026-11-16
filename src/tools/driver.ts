@@ -85,6 +85,8 @@ export function kernelResolver(
   onInference?: (inf: Inference | null, q: InferQuery) => void,
   /** sketchcraft E-15: View > Snap to Grid (grid points and lengths in grid steps). */
   gridSnap: () => boolean = () => true,
+  /** sketchcraft E-16: the kinds switched off in the legend. */
+  disabled: () => InferQuery["disabled"] = () => [],
 ): Resolver {
   return async (x, y, ctx, mods) => {
     const eng = engine();
@@ -105,6 +107,7 @@ export function kernelResolver(
       anchors: memory.anchors,
       grid: (ctx.grid ?? true) && gridSnap(),
       grid_step: gridStep(),
+      ...(disabled()?.length ? { disabled: disabled() } : {}),
       ...(ctx.pickSoftWithCtrlShift && mods?.ctrl && mods?.shift ? { soft: true } : {}),
     };
     let inf: Inference | null = null;
