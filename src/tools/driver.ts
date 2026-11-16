@@ -83,6 +83,8 @@ export function kernelResolver(
   gridStep: () => [number, number],
   memory = new InferenceMemory(),
   onInference?: (inf: Inference | null, q: InferQuery) => void,
+  /** sketchcraft E-15: View > Snap to Grid (grid points and lengths in grid steps). */
+  gridSnap: () => boolean = () => true,
 ): Resolver {
   return async (x, y, ctx, mods) => {
     const eng = engine();
@@ -101,7 +103,7 @@ export function kernelResolver(
       lock: ctx.lock ?? null,
       refs: [...(ctx.refs ?? []), ...memory.refs],
       anchors: memory.anchors,
-      grid: ctx.grid ?? true,
+      grid: (ctx.grid ?? true) && gridSnap(),
       grid_step: gridStep(),
       ...(ctx.pickSoftWithCtrlShift && mods?.ctrl && mods?.shift ? { soft: true } : {}),
     };

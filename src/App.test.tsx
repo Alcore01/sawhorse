@@ -112,6 +112,25 @@ describe("App shell", () => {
     expect(pressed("pan")).toBe(true);
   });
 
+  it("View > Snap to Grid is off by default, switches, and is remembered per viewer (sketchcraft E-15)", async () => {
+    localStorage.removeItem("sketchcraft.snapToGrid");
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "View" }));
+    const item = () => screen.getByRole("menuitemcheckbox", { name: /Snap to Grid/ });
+    expect(item().getAttribute("aria-checked")).toBe("false");
+    await act(async () => {
+      fireEvent.click(item());
+    });
+    expect(localStorage.getItem("sketchcraft.snapToGrid")).toBe("1");
+    fireEvent.click(screen.getByRole("button", { name: "View" }));
+    expect(item().getAttribute("aria-checked")).toBe("true");
+    cleanup();
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "View" }));
+    expect(item().getAttribute("aria-checked")).toBe("true");
+    localStorage.removeItem("sketchcraft.snapToGrid");
+  });
+
   it("an Alt tap is a press and release with nothing between: Alt held for an Alt+drag is not one (lane 30)", async () => {
     render(<App />);
     const hint = () => document.getElementById("hint")?.textContent ?? "";

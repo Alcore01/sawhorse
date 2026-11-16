@@ -48,3 +48,18 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 5 scénarios neufs, qui échouaient tous avant la correction et passent après ; 4 tests existants cassés par la première version (départ sur un axe) réparés par la règle « pas proposé quand le départ est sur cet axe », sans les modifier ; un test ajusté (ci-dessus). `cargo test --workspace` : 697 passés (692 de la référence + 5), 3 ignorés, aucun échec. Niveau : testé (tests du noyau d'accrochage) ; non essayé dans le navigateur : essai par JC à faire.
 - Limites connues : l'accrochage à la grille reste toujours actif sur le sol (E-15) ; couleurs d'accrochage propres à Sawhorse, pas celles de SketchUp.
+
+## H-20261116-4 · évolution · interface · Affichage > Snap to Grid (E-15)
+
+- Origine : JC, 16 nov. 2026, 13 h 47 : « il s'accroche à la grille en permanence . pas moyen de décocher les accrochages » ; E-15.
+- Fichiers :
+  - `src/tools/driver.ts` : `kernelResolver` reçoit l'état de l'interrupteur ; arrêté, la requête d'inférence part avec `grid: false` pour tous les outils.
+  - `src/App.tsx` : l'interrupteur (préférence du navigateur, clé `sketchcraft.snapToGrid`, arrêté par défaut), l'entrée Affichage > Snap to Grid et son message ; ajouté aux dépendances du menu.
+  - `src/tools/driver-grid.test.ts` (nouveau) : 2 tests ; `src/App.test.tsx` : 1 test.
+- Évolution : Affichage > Snap to Grid. Arrêté (par défaut) : plus d'accrochage aux points de la grille ni d'arrondi des longueurs tracées à la souris ; les extrémités, milieux, arêtes, faces, axes, lignes de construction et le parallèle et la perpendiculaire s'accrochent toujours ; les valeurs tapées restent exactes. Marche : comme Sawhorse d'origine.
+- Écarté : garder le choix dans le modèle (c'est une préférence de travail, pas une donnée du dessin) ; un interrupteur qui couperait toutes les inférences (on ne pourrait plus tracer juste ; à décider par JC).
+- Effet sur les résultats : arrêté, les points tracés à la souris sur le sol ne tombent plus sur la grille et les longueurs ne sont plus arrondies (signe « ~ » devant la longueur).
+- Effet sur les projets existants : aucun ; pas de changement de format.
+- Confidentialité : non (préférence gardée dans le navigateur).
+- Vérification : 3 tests neufs (l'interrupteur arrêté envoie `grid: false` même à un outil qui demande la grille ; en marche, chaque outil garde son choix ; le menu est arrêté par défaut, bascule et se souvient après rechargement), qui échouent sans le changement ; un premier essai a montré que le menu, mis en cache, ne se rafraîchissait pas : dépendance ajoutée. Suite complète : 891 passés (888 + 3), 253 ignorés, aucun échec. Niveau : testé ; essai dans le navigateur par JC à faire.
+- Limites connues : pas de raccourci clavier pour l'interrupteur.
