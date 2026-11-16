@@ -83,3 +83,18 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 4 tests neufs, échouant sans le changement : noyau (point coupé → l'arête prend la main ; axes coupés mais verrou tenu ; grille coupée) ; requête (les types coupés partent au noyau) ; légende (bascule et mémoire) ; orbite (pivot = point visé pendant un geste, point sous le curseur sinon). Rust : 698 passés (697 + 1), 3 ignorés ; TypeScript : 894 passés (891 + 3), 253 ignorés ; aucun échec. Niveau : testé ; essai dans le navigateur par JC à faire.
 - Limites connues : le pivot « point visé » est celui de la vue, pas le centre du modèle ; pas de raccourcis clavier pour les interrupteurs.
+
+## H-20261116-6 · correction · interface · Ligne continue qui change de plan (E-18)
+
+- Origine : JC, 16 nov. 2026, 14 h 20 : « quand on dessine dessigne les lignes ici je dessines sur l'axe vert, je veux sans interrompre continuer le trais sur l'axe bleu et il ne s'accroche plus sur l'axe, si j'interrompt le trais et que je continue avec une nouvelle ligne il reprend l'accrochage » ; E-18.
+- Constat : `src/tools/line.ts` fixe le plan de la chaîne au premier segment (« Line 100 cm on the ground ») et le transmet à l'accrochage ; le noyau d'accrochage écarte alors l'axe bleu (hors du plan), et un point hors du plan était refusé (« off this line's plane »).
+- Fichiers :
+  - `src/tools/line.ts` : une chaîne « libre » (pas commencée dans une face, pas de plan choisi aux flèches) ne transmet plus son plan à l'accrochage ; un segment qui quitte le plan va sur un nouveau plan ; si le segment précédent était seul sur son plan et n'est pas aligné, il est annulé et retracé avec le nouveau sur le plan qu'ils partagent (une annulation) ; le segment précédent sert aussi de référence pour le parallèle et la perpendiculaire.
+  - `src/tools/draw.test.ts` : 3 tests.
+- Correction : comme dans SketchUp, on trace au sol puis, sans lâcher, on monte le long de l'axe bleu ; un rectangle vertical tracé d'un trait depuis le sol se ferme en face sur un seul plan.
+- Écarté : garder des segments à cheval sur deux esquisses sans les retracer (le rectangle ne formerait pas de face) ; retracer des segments plus anciens (ils peuvent appartenir à une forme au sol).
+- Effet sur les résultats : une chaîne libre n'est plus refusée hors de son plan ; l'annulation du segment retracé et du nouveau se fait en un pas.
+- Effet sur les projets existants : aucun ; pas de changement de format.
+- Confidentialité : non.
+- Vérification : 3 tests neufs ; les 2 premiers (montée sans interruption avec retracé et fermeture du rectangle vertical ; changement de plan après deux segments au sol, sans annulation) échouent sans le changement ; le 3e (plan choisi aux flèches : la chaîne reste tenue) passe avant et après, il garde l'ancien comportement voulu. Suite complète : 897 passés (894 + 3), 253 ignorés, aucun échec. Niveau : testé (hôte de test, sans noyau) ; non vérifié avec le vrai noyau (la suite Playwright `e2e/draw.spec.ts` ne tourne pas ici) : essai par JC à faire.
+- Limites connues : seul le segment immédiatement précédent est retracé ; une chaîne libre en l'air sans accrochage tombe sur le sol (comme SketchUp).
