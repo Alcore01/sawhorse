@@ -98,3 +98,19 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 3 tests neufs ; les 2 premiers (montée sans interruption avec retracé et fermeture du rectangle vertical ; changement de plan après deux segments au sol, sans annulation) échouent sans le changement ; le 3e (plan choisi aux flèches : la chaîne reste tenue) passe avant et après, il garde l'ancien comportement voulu. Suite complète : 897 passés (894 + 3), 253 ignorés, aucun échec. Niveau : testé (hôte de test, sans noyau) ; non vérifié avec le vrai noyau (la suite Playwright `e2e/draw.spec.ts` ne tourne pas ici) : essai par JC à faire.
 - Limites connues : seul le segment immédiatement précédent est retracé ; une chaîne libre en l'air sans accrochage tombe sur le sol (comme SketchUp).
+
+## H-20261116-7 · correction · module · Une forme se ferme contre l'arête d'une autre esquisse (E-19)
+
+- Origine : JC, 16 nov. 2026, 14 h 28 : « j'ai réalisé une deuxième rectangle attenant mais sa surface ne se rempli pas » ; E-19.
+- Constat : le noyau range chaque tracé dans l'esquisse de son plan (`Model::sketch_on`) et ne cherche les contours fermés que parmi les arêtes de cette esquisse. L'arête verticale commune aux deux rectangles appartient à l'esquisse du premier (plan y = 0) : dans le plan du second (x = 0), le contour restait ouvert. Reproduit par un test (`regions: []`).
+- Fichiers :
+  - `crates/kernel/src/model.rs` : `draw_in_sketch` : après un tracé ouvert, les arêtes des autres esquisses du même contexte qui sont dans ce plan et touchent une extrémité du tracé sont tracées aussi dans cette esquisse, quand leurs deux bouts y sont déjà des points (seul cas où elles peuvent fermer un contour) ; `coplanar_edges_at` les trouve.
+  - `crates/kernel/tests/draw.rs` : 1 test (le cas de JC, et un tracé qui ne touche une arête que par un bout n'importe rien).
+  - `crates/inference/src/infer.rs` : mise en forme seule (`cargo fmt`) d'une ligne de H-20261116-3.
+- Correction : comme dans SketchUp, où les arêtes sont partagées : le second rectangle attenant se remplit.
+- Écarté : fusionner les esquisses de plans différents (une esquisse est plane) ; copier toutes les arêtes coplanaires à chaque tracé (des doublons inutiles).
+- Effet sur les résultats : l'arête commune existe désormais dans les deux esquisses (une par plan) ; les autres tracés ne changent pas.
+- Effet sur les projets existants : aucun à l'ouverture ; pas de changement de format. Il faut recompiler le noyau (`npm run wasm`).
+- Confidentialité : non.
+- Vérification : 1 test neuf, qui échouait avant (`regions: []`) et passe après ; `cargo test --workspace` : 699 passés (698 + 1), 3 ignorés, aucun échec (dont les empreintes « golden » du noyau). Niveau : testé (noyau) ; essai dans le navigateur par JC à faire.
+- Limites connues : les arêtes des faces des solides (volumes déjà poussés) ne sont pas encore partagées ; un tracé fermé d'un coup (`closed`) n'en importe pas (il n'en a pas besoin pour se fermer) ; effacer l'arête commune n'efface que celle de l'esquisse visée.

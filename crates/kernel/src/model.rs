@@ -3927,7 +3927,70 @@ impl Model {
         if local.len() < 2 {
             return Err(SketchError::Degenerate);
         }
-        s.insert_polyline(&local, closed)
+        let mut regions = s.insert_polyline(&local, closed)?;
+        // sketchcraft E-19: an open stroke that ends on an edge of another sketch lying on
+        // this plane (two upright rectangles sharing a vertical edge) closes against it, as
+        // edges are shared in SketchUp: that edge is drawn into this sketch too when both
+        // its ends are now points of it (only then can it close a loop).
+        if !closed {
+            let ends = [pts[0], pts[pts.len() - 1]];
+            for (a, b) in self.coplanar_edges_at(sid, &plane, ends) {
+                let s = &mut self.sketches[sid];
+                let (la, lb) = (plane.to_local(a), plane.to_local(b));
+                let (Some(va), Some(vb)) = (s.vertex_at(la), s.vertex_at(lb)) else {
+                    continue;
+                };
+                if va == vb || s.has_edge(va, vb) {
+                    continue;
+                }
+                if let Ok(more) = s.insert_segment(la, lb) {
+                    regions.extend(more);
+                }
+            }
+            regions.sort();
+            regions.dedup();
+        }
+        Ok(regions)
+    }
+
+    /// sketchcraft E-19: the edges of the other sketches of the open context that lie on
+    /// `plane` and touch one of `ends` (world points).
+    fn coplanar_edges_at(
+        &self,
+        sid: SketchId,
+        plane: &Plane,
+        ends: [DVec3; 2],
+    ) -> Vec<(DVec3, DVec3)> {
+        let parent = self.sketches[sid].parent;
+        let mut out = Vec::new();
+        for &k in &self.sketch_order {
+            if k == sid {
+                continue;
+            }
+            let s = &self.sketches[k];
+            if s.parent != parent {
+                continue;
+            }
+            let sp = *s.plane();
+            for (_, [va, vb]) in s.edges() {
+                let (Some(a), Some(b)) = (s.vertex(va), s.vertex(vb)) else {
+                    continue;
+                };
+                let (a, b) = (sp.to_world(a), sp.to_world(b));
+                if plane.signed_distance(a).abs() > PLANARITY
+                    || plane.signed_distance(b).abs() > PLANARITY
+                {
+                    continue;
+                }
+                if ends
+                    .iter()
+                    .any(|e| e.distance(a) <= PLANARITY || e.distance(b) <= PLANARITY)
+                {
+                    out.push((a, b));
+                }
+            }
+        }
+        out
     }
 
     /// The object and the ordinal of its face with persistent id `face`.
