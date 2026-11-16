@@ -198,3 +198,15 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : le test neuf échoue sans le changement et passe ; suite complète : 900 passés (899 + 1), 253 ignorés, aucun échec. Niveau : testé ; essai par JC à faire.
 - Limites connues : une pente négative (« -70% », « -1:2 ») suit la même règle.
+
+## H-20261116-14 · évolution · interface · Gomme : arêtes seulement (E-23)
+
+- Origine : JC, 16 nov. 2026, 17 h 13 : « la gomme efface le contenu des faces , dans sketchup ce n'est pas le cas. on utilise la flèche de sélection et la touche del/suppr pour retirer les faces » ; E-23.
+- Fichiers : `src/tools/erase.ts` (un clic sur une face ou une surface d'esquisse n'efface rien et affiche « The Eraser takes edges. To remove a face, select it (Space) and press Delete. » ; le glissé ne ramasse plus que les arêtes et courbes ; le survol ne surligne plus que les arêtes et courbes ; Sélection + Suppr inchangé) ; `src/tools/erase.test.ts` (1 test).
+- Évolution : comme dans SketchUp, la gomme efface les arêtes (et la face qu'elles bordent disparaît avec elles, comme avant) ; une face se retire en la sélectionnant puis avec Suppr.
+- Écarté : garder l'effacement des faces imprimées à la gomme (comportement de Sawhorse) : contraire à l'usage de SketchUp demandé.
+- Effet sur les résultats : aucun sur la géométrie ; moins d'effacements involontaires.
+- Effet sur les projets existants : aucun.
+- Confidentialité : non.
+- Vérification : 1 test neuf (clic sur une face et sur une surface d'esquisse, glissé sur une surface : rien n'est effacé, le message s'affiche ; une arête s'efface toujours), qui échoue sans le changement ; un premier essai a montré qu'un clic sur un sommet doit garder son refus d'origine (test existant) : le message est limité aux faces et surfaces. Suite complète : 901 passés (900 + 1), 253 ignorés, aucun échec. Niveau : testé ; essai par JC à faire.
+- Limites connues : le guide utilisateur (docs/USER-GUIDE.md) décrit encore l'ancien comportement.
