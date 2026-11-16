@@ -143,3 +143,18 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : le test neuf échoue avec le noyau de H-20261116-8 et passe ; `cargo test --workspace` : 701 passés (700 + 1), 3 ignorés, aucun échec. Niveau : testé (noyau) ; essai dans le navigateur par JC à faire.
 - Limites connues : celles de H-20261116-8 (pas de partage avec les volumes poussés).
+
+## H-20261116-10 · évolution · interface · Rapporteur : zéro sur la référence, angle de la référence affiché (E-20)
+
+- Origine : JC, 16 nov. 2026, 15 h 51 : « en fait il y a plusieurs choses, quand on bouge la référence on ne sait pas ce que représente l'angle. quand on pose le compas on ne sait pas le faire tourner comme dans sketchup pour son repère d'angle , exemple ic j'ai mesuré 37 a partir du dessous de la toiture » ; E-20 (suite de E-01, H-20261116-2).
+- Constat : avant le clic de la référence, le rapporteur était un cercle complet aux graduations fixes (zéro sur un axe du plan sans rapport avec le dessin), et rien ne disait l'angle de la référence en cours.
+- Fichiers :
+  - `src/tools/protractor.ts` : `view()` : un demi-rapporteur posé sur sa ligne de base (le diamètre par le sommet), graduations tous les 15° depuis son zéro ; ce zéro suit le curseur pendant le choix de la référence (comme SketchUp), puis reste sur la référence cliquée, marquée « 0° » ; pendant le choix, l'étiquette « ref 37° (75.4%) » donne l'angle de la référence depuis l'horizontale du plan (depuis l'axe rouge sur un plan horizontal) ; `levelIn` et `referenceAngle` (0 à 90°).
+  - `src/tools/protractor.test.ts` : 2 tests.
+- Évolution : on voit ce que mesure le rapporteur : la référence et son angle (ex. le dessous d'une toiture à 37°), puis l'angle de la ligne de construction depuis cette référence.
+- Écarté : afficher l'angle de la référence dans la case des valeurs (elle sert à taper l'angle de la ligne de construction).
+- Effet sur les résultats : aucun (affichage seul) ; les lignes de construction posées sont les mêmes.
+- Effet sur les projets existants : aucun.
+- Confidentialité : non.
+- Vérification : 2 tests neufs (angle d'une référence, dans les deux sens, à plat ; affichage pendant le choix de la référence : base du demi-rapporteur dans la direction du curseur, étiquette « ref 37° (75.4%) », puis « 0° » sur la référence), qui échouent sans le changement ; suite complète : 899 passés (897 + 2), 253 ignorés, aucun échec. Niveau : testé ; essai dans le navigateur par JC à faire.
+- Limites connues : l'angle de la référence est donné sans signe (0 à 90°) ; pas d'accrochage de la référence aux graduations (seulement aux arêtes, axes et lignes).
