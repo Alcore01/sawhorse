@@ -472,6 +472,45 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
             }
         }
     }
+    // sketchcraft E-21: a hovered point's axis line crossing a guide line or a nearby edge
+    // (plumb with a corner, on a roof pitch guide).
+    for &a in &anchors {
+        for &d in &AXES {
+            if !ctx.in_plane(d) {
+                continue;
+            }
+            for g in scene.guides.iter().filter(|g| g.dir != DVec3::ZERO) {
+                let gd = g.dir.normalize_or_zero();
+                if gd == DVec3::ZERO || d.cross(gd).length() < 1e-9 {
+                    continue;
+                }
+                let Some((u, w)) = line_line(a, d, g.point, gd) else {
+                    continue;
+                };
+                let (p, r) = (a + d * u, g.point + gd * w);
+                if p.distance(r) > 1e-9 * (1.0 + p.length()) || u.abs() < 1e-9 {
+                    continue;
+                }
+                if let Some(mut c) = ctx.point(InferenceKind::FromPoint, p, None) {
+                    c.kind = InferenceKind::FromPoint;
+                    c.lines = vec![line(a, p, InferenceKind::FromPoint)];
+                    points.push(c);
+                }
+            }
+            for &i in &line_near {
+                let si = &scene.segs[i];
+                if let Some(p) = segment_line_crossing(si.a, si.b, a, d)
+                    && p.distance(a) > 1e-9
+                    && let Some(mut c) =
+                        ctx.point(InferenceKind::FromPoint, p, Some(edge_entity(i)))
+                {
+                    c.kind = InferenceKind::FromPoint;
+                    c.lines = vec![line(a, p, InferenceKind::FromPoint)];
+                    points.push(c);
+                }
+            }
+        }
+    }
     let off = |k: InferenceKind| q.disabled.contains(&k);
     let points: Vec<Cand> = points
         .into_iter()

@@ -172,3 +172,17 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : le test neuf échoue sans le changement (point à un seul alignement) et passe ; `cargo test --workspace` : 702 passés (701 + 1), 3 ignorés, aucun échec. Niveau : testé (noyau) ; essai dans le navigateur par JC à faire.
 - Limites connues : seulement les deux derniers points survolés, et seulement les axes (pas le parallèle à une arête).
+
+## H-20261116-12 · correction · module · L'alignement d'un point survolé croise les lignes de construction et les arêtes (E-21)
+
+- Origine : JC, 16 nov. 2026, 16 h 12 : « si j'essaye de l'accrocher le croisement disparait », avec deux captures : une ligne tracée le long d'une ligne de construction de pente (rapporteur), à l'aplomb d'un coin survolé ; le croisement s'affiche à l'approche (« From Point »), puis « On Guide » l'emporte sur la ligne ; E-21.
+- Constat : `crates/inference/src/infer.rs` ne croisait l'alignement d'un point survolé qu'avec les lignes partant du départ et (H-20261116-11) avec celui d'un autre point survolé ; sur la ligne de construction, seul « On Guide » restait. Reproduit par un test.
+- Fichiers :
+  - `crates/inference/src/infer.rs` : le croisement d'une ligne d'axe par un point survolé avec une ligne de construction, ou avec une arête proche du curseur, est un point « From Point » (il l'emporte sur « On Guide » et « On Edge », comme un point).
+  - `crates/inference/tests/infer.rs` : 1 test (la pente de toit à 37° et l'aplomb du coin ; une arête au sol et l'aplomb d'un coin).
+- Correction : comme dans SketchUp, le point sur la ligne de construction à l'aplomb du coin s'accroche.
+- Effet sur les résultats : des points d'accrochage de plus aux croisées des alignements avec les lignes de construction et les arêtes ; coupés avec « From Point » dans la légende.
+- Effet sur les projets existants : aucun ; pas de changement de format. Il faut recompiler le noyau (`npm run wasm`).
+- Confidentialité : non.
+- Vérification : le test neuf échoue sans le changement (« On Guide ») et passe ; `cargo test --workspace` : 703 passés (702 + 1), 3 ignorés, aucun échec. Niveau : testé (noyau) ; essai dans le navigateur par JC à faire.
+- Limites connues : seulement les deux derniers points survolés, et leurs alignements le long des axes.
