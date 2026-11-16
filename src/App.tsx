@@ -52,6 +52,7 @@ import { LineTool } from "./tools/line";
 import { CircleTool } from "./tools/circle";
 import { ArcTool } from "./tools/arc";
 import { DimensionTool, TapeTool } from "./tools/tape";
+import { ProtractorTool } from "./tools/protractor";
 import { annotationView } from "./lib/annotations";
 import { InferenceMemory, kernelResolver, ToolDriver } from "./tools/driver";
 import { friendlyError, setNameSource } from "./lib/names";
@@ -1383,6 +1384,7 @@ export function App() {
       ["circle", new CircleTool(host)],
       ["arc", new ArcTool(host)],
       ["tape", new TapeTool(host)],
+      ["protractor", new ProtractorTool(host)],
       ["dim", new DimensionTool(host)],
       ["pushpull", new PushTool(host)],
       ["move", new MoveTool(host)],
@@ -2900,7 +2902,7 @@ export function App() {
           : []),
       ],
       Plugins: plugins.menu,
-      Tools: [{ label: "Section Plane", title: "Cut the model with a plane (no default key)", checked: toolId === "section", onSelect: () => selectTool("section") }],
+      Tools: [{ label: "Protractor", title: "Place a guide line at an angle: degrees, a slope (70%) or a rise and run (1:2) (no default key)", checked: toolId === "protractor", onSelect: () => selectTool("protractor") }, { label: "Section Plane", title: "Cut the model with a plane (no default key)", checked: toolId === "section", onSelect: () => selectTool("section") }],
       // The browser demo's way back to the site (the desktop app has no Help entries yet).
       ...(isWebDemo()
         ? {

@@ -1,0 +1,21 @@
+# EVOLUTIONS — sketchcraft
+
+Ce qui est à faire ou à décider. Une ligne par évolution, numérotée E-NN, jamais renumérotée.
+Statuts : proposée · retenue · en cours · faite (→ H-…) · écartée · retirée.
+Base : Sawhorse 0.1.0-alpha.6, commit a7a637d (15 nov. 2026). But (JC, 16 nov. 2026) : la volumétrie extérieure des bâtiments, avec les outils de SketchUp.
+
+| N° | Évolution | Origine | Statut | Priorité | Critère de réussite | Remarques |
+|---|---|---|---|---|---|---|
+| E-01 | Rapporteur : ligne de construction à un angle donné (degrés, pente en %, rapport 1:2) | JC, 16 nov. 2026, 10 h 41 : « il faut juste les outils de base comme le crayon, le rapporteur d'angle et quelques outils typique qu'il manque pour faire le même travail que  sketchup pour les volumétries externes des batiments » | faite (→ H-20261116-2) | 1 | Sommet, ligne de référence, puis clic ou angle tapé : une ligne de construction passe par le sommet à l'angle voulu, sur le plan choisi (face, sol, ou verrouillé par les flèches) ; les formes s'y accrochent | Fonctionnement seul. Essai dans le navigateur par JC à faire. |
+| E-02 | Outil Axes : déplacer et orienter le repère de dessin | Claude, 16 nov. 2026 (liste des manques) | proposée | 1 (suggérée) | Un bâtiment non parallèle aux axes se dessine avec les inférences d'axes alignées sur lui | |
+| E-03 | Intersecter les faces (avec le modèle, avec la sélection) | Claude, 16 nov. 2026 | proposée | 1 (suggérée) | Deux volumes qui se pénètrent (toits, lucarnes) reçoivent leurs arêtes d'intersection | Le noyau a des booléens (manifold) |
+| E-04 | Outils solides : union, soustraction, découpe, enveloppe extérieure | Claude, 16 nov. 2026 | proposée | 1 (suggérée) | Deux solides choisis donnent le solide combiné, étanche, en une annulation | Le noyau a les booléens, sans outil dans l'interface |
+| E-05 | Perspective à 2 points de fuite (verticales droites) | Claude, 16 nov. 2026, après la question de JC (10 h 46) : « la vue orthogonal ou perspective » | proposée | 2 (suggérée) | En vue 2 points, les verticales du modèle restent verticales à l'écran | La projection parallèle et la perspective existent déjà (Affichage > Perspective) |
+| E-06 | Champ de vision réglable | Claude, 16 nov. 2026 | proposée | 2 (suggérée) | Le champ de vision se tape (en degrés) et se garde dans les scènes | Fixé à 35° dans `src/viewport/camera.ts` |
+| E-07 | Échelles métriques d'architecture sur les planches (1:50, 1:100, 1:200, 1:500) | Claude, 16 nov. 2026 | proposée | 2 (suggérée) | Une vue de planche se règle à 1:100 et s'imprime à l'échelle | Seules 1:1 à 1:48 et les échelles impériales existent |
+| E-08 | Nord et géolocalisation (angle du nord, longitude, fuseau) pour les ombres | Claude, 16 nov. 2026 | proposée | 2 (suggérée) | L'ombre à une date et une heure données correspond à l'orientation réelle | Seule la latitude existe |
+| E-09 | Texte et texte 3D dans le modèle | Claude, 16 nov. 2026 | proposée | 2 (suggérée) | Une étiquette et un texte 3D se placent, se déplacent et s'enregistrent | Absent du modèle (présent sur les planches) |
+| E-10 | Aire et volume de la sélection | Claude, 16 nov. 2026 | proposée | 2 (suggérée) | La sélection affiche son aire (faces) et son volume (solides) | À vérifier : peut-être déjà en partie présent |
+| E-11 | Bac à sable : terrain depuis des courbes de niveau | Claude, 16 nov. 2026 | proposée | 3 (suggérée) | Des courbes de niveau donnent une surface de terrain | |
+| E-12 | Caméra : se placer, marcher, regarder autour | Claude, 16 nov. 2026 | proposée | 3 (suggérée) | Une vue à hauteur d'homme se place en un clic et une hauteur d'œil | |
+| E-13 | Secteur et main levée | Claude, 16 nov. 2026 | proposée | 3 (suggérée) | | Rectification de la liste du 16 nov. : les vues Arrière, Gauche et Dessous existent déjà (menu Affichage, guide utilisateur) |

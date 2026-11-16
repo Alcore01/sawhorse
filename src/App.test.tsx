@@ -39,8 +39,11 @@ describe("App shell", () => {
     expect(caps).toEqual(["␣", "E", "L", "R", "C", "A", "P", "M", "Q", "S", "F", "W", "T", "D", "B", "O", "H"]);
     // Lane 12's Section Plane has no default key (SketchUp 2017 had none either); lane 30's
     // Orbit and Pan have SketchUp 2017's O and H.
-    expect(TOOLS).toHaveLength(18);
+    // sketchcraft E-01: the Protractor, without a default key either.
+    expect(TOOLS).toHaveLength(19);
     expect(TOOLS.find((t) => t.id === "section")?.key).toBe("");
+    expect(TOOLS.find((t) => t.id === "protractor")?.key).toBe("");
+    expect(document.querySelector('.tool[data-tool="protractor"]')).not.toBeNull();
     expect(document.querySelector('.tool[data-tool="section"] kbd')).toBeNull();
     expect(pressed("select")).toBe(true);
   });
