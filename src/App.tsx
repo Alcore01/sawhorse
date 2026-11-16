@@ -170,6 +170,17 @@ function sameItem(a: Item, b: Item): boolean {
   return "node" in a ? "node" in b && a.node === b.node : "object" in b && a.object === b.object;
 }
 
+/** sketchcraft E-15: View > Snap to Grid, per viewer; off unless turned on (as SketchUp,
+ * which never snaps to a grid). */
+const SNAP_GRID_KEY = "sketchcraft.snapToGrid";
+function loadSnapGrid(): boolean {
+  try {
+    return localStorage.getItem(SNAP_GRID_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 /** Model or Sheets (lane 12), per viewer. */
 const MODE_KEY = "sawhorse.mode";
 function loadMode(): WorkMode {
@@ -408,6 +419,9 @@ export function App() {
   const [view, setViewState] = useState<ViewId>("iso");
   const [viewSeq, setViewSeq] = useState(0);
   const [projection, setProjection] = useState<Projection>("parallel");
+  const [snapGrid, setSnapGrid] = useState<boolean>(loadSnapGrid);
+  const snapGridRef = useRef(snapGrid);
+  snapGridRef.current = snapGrid;
   const [fitSeq, setFitSeq] = useState(0);
   const [camView, setCamView] = useState<ViewId | null>("iso");
   const setView = useCallback((v: ViewId) => {
@@ -1426,6 +1440,7 @@ export function App() {
             lastInference: inf,
           };
         },
+        () => snapGridRef.current,
       ),
       () => activeRef.current ?? (toolsRef.current!.get("select") as Tool),
     );
@@ -2877,6 +2892,21 @@ export function App() {
         "-",
         { label: "Perspective", checked: projection === "perspective", onSelect: () => setProjection((p) => (p === "perspective" ? "parallel" : "perspective")) },
         { label: "Grid", checked: gridShown(st?.style), title: "Show or hide the ground grid (saved with the document and with each scene)", onSelect: () => setGrid(!gridShown(st?.style)) },
+        {
+          label: "Snap to Grid",
+          checked: snapGrid,
+          title: "Snap to the ground grid's points, and round lengths drawn with the mouse to grid steps (off: as SketchUp; typed values are exact either way)",
+          onSelect: () => {
+            const next = !snapGrid;
+            setSnapGrid(next);
+            try {
+              localStorage.setItem(SNAP_GRID_KEY, next ? "1" : "0");
+            } catch {
+              // A per-viewer convenience: without storage it lasts this visit.
+            }
+            setMessage({ text: next ? "Snap to Grid on: grid points and grid-step lengths." : "Snap to Grid off: points, edges, axes and guides still snap.", error: false });
+          },
+        },
         "-",
         ...VIEWS.map((v) => ({ label: `${v.label} view`, onSelect: () => setView(v.id) })),
         "-",
@@ -2917,7 +2947,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;
