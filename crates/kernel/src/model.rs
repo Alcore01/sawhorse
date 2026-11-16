@@ -3827,7 +3827,7 @@ impl Model {
         curve: Option<&StrokeCurve>,
     ) -> Result<OpOutcome, KernelError> {
         let sid = self.sketch_on(plane);
-        let regions = self.draw_in_sketch(sid, pts, closed)?;
+        let (sid, regions) = self.draw_in_sketch_closing(sid, pts, closed, curve.is_none())?;
         let curve = match curve {
             Some(c) => self.stroke_to_curve(sid, pts, closed, c)?,
             None => None,
@@ -3912,8 +3912,25 @@ impl Model {
         pts: &[DVec3],
         closed: bool,
     ) -> Result<Vec<RegionId>, SketchError> {
-        let s = &mut self.sketches[sid];
-        let plane = *s.plane();
+        self.draw_in_sketch_closing(sid, pts, closed, false)
+            .map(|(_, r)| r)
+    }
+
+    /// [`Self::draw_in_sketch`], closing against other sketches' edges (sketchcraft E-19):
+    /// an open stroke that, with edges of other sketches of the open context lying on its
+    /// plane and connected to it, closes a loop takes those edges into its sketch (edges are
+    /// shared in SketchUp); otherwise nothing is added. With `relocate`, a straight stroke
+    /// that closes nothing on its plane (a single line has no plane of its own) goes onto
+    /// the plane through it and an edge touching it where it does close one. Returns the
+    /// sketch the stroke went into and the regions it bounds.
+    fn draw_in_sketch_closing(
+        &mut self,
+        sid: SketchId,
+        pts: &[DVec3],
+        closed: bool,
+        relocate: bool,
+    ) -> Result<(SketchId, Vec<RegionId>), SketchError> {
+        let plane = *self.sketches[sid].plane();
         let mut local = Vec::with_capacity(pts.len());
         for p in pts {
             if !p.is_finite() {
@@ -3927,44 +3944,47 @@ impl Model {
         if local.len() < 2 {
             return Err(SketchError::Degenerate);
         }
-        let mut regions = s.insert_polyline(&local, closed)?;
-        // sketchcraft E-19: an open stroke that ends on an edge of another sketch lying on
-        // this plane (two upright rectangles sharing a vertical edge) closes against it, as
-        // edges are shared in SketchUp: that edge is drawn into this sketch too when both
-        // its ends are now points of it (only then can it close a loop).
-        if !closed {
-            let ends = [pts[0], pts[pts.len() - 1]];
-            for (a, b) in self.coplanar_edges_at(sid, &plane, ends) {
-                let s = &mut self.sketches[sid];
-                let (la, lb) = (plane.to_local(a), plane.to_local(b));
-                let (Some(va), Some(vb)) = (s.vertex_at(la), s.vertex_at(lb)) else {
-                    continue;
-                };
-                if va == vb || s.has_edge(va, vb) {
-                    continue;
-                }
-                if let Ok(more) = s.insert_segment(la, lb) {
-                    regions.extend(more);
-                }
-            }
+        let before = self.sketches[sid].clone();
+        let mut regions = self.sketches[sid].insert_polyline(&local, closed)?;
+        if closed {
+            return Ok((sid, regions));
+        }
+        let parent = self.sketches[sid].parent;
+        let foreign = self.edges_on_plane(&plane, parent, &[sid]);
+        let mut s = self.sketches[sid].clone();
+        let more = import_connected(&mut s, &plane, pts, &foreign);
+        if !more.is_empty() {
+            self.sketches[sid] = s;
+            regions.extend(more);
             regions.sort();
             regions.dedup();
+            return Ok((sid, regions));
         }
-        Ok(regions)
+        if relocate && regions.is_empty() && straight(pts) {
+            if let Some((k, rs)) = self.close_on_another_plane(sid, pts, parent, &before) {
+                let emptied = before.edge_count() == 0 && self.sketch_order.first() != Some(&sid);
+                self.sketches[sid] = before;
+                if emptied {
+                    self.sketches.remove(sid);
+                    self.sketch_order.retain(|&x| x != sid);
+                }
+                return Ok((k, rs));
+            }
+        }
+        Ok((sid, regions))
     }
 
-    /// sketchcraft E-19: the edges of the other sketches of the open context that lie on
-    /// `plane` and touch one of `ends` (world points).
-    fn coplanar_edges_at(
+    /// sketchcraft E-19: the edges (world) of the open context's sketches other than
+    /// `skip` lying on `plane`.
+    fn edges_on_plane(
         &self,
-        sid: SketchId,
         plane: &Plane,
-        ends: [DVec3; 2],
+        parent: Option<crate::ids::NodeId>,
+        skip: &[SketchId],
     ) -> Vec<(DVec3, DVec3)> {
-        let parent = self.sketches[sid].parent;
         let mut out = Vec::new();
         for &k in &self.sketch_order {
-            if k == sid {
+            if skip.contains(&k) {
                 continue;
             }
             let s = &self.sketches[k];
@@ -3977,20 +3997,123 @@ impl Model {
                     continue;
                 };
                 let (a, b) = (sp.to_world(a), sp.to_world(b));
-                if plane.signed_distance(a).abs() > PLANARITY
-                    || plane.signed_distance(b).abs() > PLANARITY
-                {
-                    continue;
-                }
-                if ends
-                    .iter()
-                    .any(|e| e.distance(a) <= PLANARITY || e.distance(b) <= PLANARITY)
+                if plane.signed_distance(a).abs() <= PLANARITY
+                    && plane.signed_distance(b).abs() <= PLANARITY
                 {
                     out.push((a, b));
                 }
             }
         }
         out
+    }
+
+    /// sketchcraft E-19: a straight stroke that closed nothing where it was drawn: the
+    /// planes through it and an edge of another sketch touching one of its ends, in turn;
+    /// on the first where it closes a loop (with the edges there connected to it), it is
+    /// drawn into that plane's sketch (made if need be). `sid` is left out (`before` is
+    /// what it holds without the stroke).
+    fn close_on_another_plane(
+        &mut self,
+        sid: SketchId,
+        pts: &[DVec3],
+        parent: Option<crate::ids::NodeId>,
+        before: &Sketch,
+    ) -> Option<(SketchId, Vec<RegionId>)> {
+        let (a, b) = (pts[0], pts[pts.len() - 1]);
+        let d = (b - a).normalize_or_zero();
+        if d == DVec3::ZERO {
+            return None;
+        }
+        let own = *self.sketches[sid].plane();
+        let mut tried: Vec<DVec3> = vec![own.normal];
+        let mut touching: Vec<(DVec3, DVec3)> = Vec::new();
+        for &k in &self.sketch_order {
+            let s = if k == sid { before } else { &self.sketches[k] };
+            if s.parent != parent {
+                continue;
+            }
+            let sp = *s.plane();
+            for (_, [va, vb]) in s.edges() {
+                let (Some(p), Some(q)) = (s.vertex(va), s.vertex(vb)) else {
+                    continue;
+                };
+                let (p, q) = (sp.to_world(p), sp.to_world(q));
+                if [a, b]
+                    .iter()
+                    .any(|e| e.distance(p) <= PLANARITY || e.distance(q) <= PLANARITY)
+                {
+                    touching.push((p, q));
+                }
+            }
+        }
+        for (p, q) in touching {
+            let n = d.cross(q - p);
+            if n.length() <= 1e-9 * (q - p).length().max(1e-12) {
+                continue;
+            }
+            let n = n.normalize();
+            if tried.iter().any(|t| t.dot(n).abs() >= 1.0 - 1e-12) {
+                continue;
+            }
+            tried.push(n);
+            let Ok(plane) = Plane::new(a, n) else {
+                continue;
+            };
+            let existing = self.sketch_order.iter().copied().find(|&k| {
+                let sp = self.sketches[k].plane();
+                k != sid
+                    && self.sketches[k].parent == parent
+                    && sp.normal.dot(plane.normal).abs() >= 1.0 - 1e-12
+                    && sp.signed_distance(plane.origin).abs() <= PLANARITY
+            });
+            let mut trial = match existing {
+                Some(k) => self.sketches[k].clone(),
+                None => {
+                    let mut s = Sketch::new(plane);
+                    s.parent = parent;
+                    s
+                }
+            };
+            let tp = *trial.plane();
+            let local: Vec<_> = pts.iter().map(|&p| tp.to_local(p)).collect();
+            let Ok(mut rs) = trial.insert_polyline(&local, false) else {
+                continue;
+            };
+            let mut skip = vec![sid];
+            skip.extend(existing);
+            let mut foreign = self.edges_on_plane(&tp, parent, &skip);
+            // The sketch the stroke was drawn into, without the stroke.
+            let bp = *before.plane();
+            for (_, [va, vb]) in before.edges() {
+                if let (Some(x), Some(y)) = (before.vertex(va), before.vertex(vb)) {
+                    let (x, y) = (bp.to_world(x), bp.to_world(y));
+                    if tp.signed_distance(x).abs() <= PLANARITY
+                        && tp.signed_distance(y).abs() <= PLANARITY
+                    {
+                        foreign.push((x, y));
+                    }
+                }
+            }
+            rs.extend(import_connected(&mut trial, &tp, pts, &foreign));
+            if rs.is_empty() {
+                continue;
+            }
+            rs.sort();
+            rs.dedup();
+            let k = match existing {
+                Some(k) => {
+                    self.sketches[k] = trial;
+                    k
+                }
+                None => {
+                    let k = self.sketches.insert(trial);
+                    self.sketch_order.push(k);
+                    k
+                }
+            };
+            return Some((k, rs));
+        }
+        None
     }
 
     /// The object and the ordinal of its face with persistent id `face`.
@@ -4450,4 +4573,68 @@ mod tests {
             "one half of the split square and the triangle"
         );
     }
+}
+
+/// sketchcraft E-19: whether the points lie on one straight line.
+fn straight(pts: &[DVec3]) -> bool {
+    let (a, b) = (pts[0], pts[pts.len() - 1]);
+    let d = b - a;
+    d.length() > PLANARITY
+        && pts
+            .iter()
+            .all(|&p| d.cross(p - a).length() <= PLANARITY * d.length())
+}
+
+/// sketchcraft E-19: into `s` (on `plane`), the `foreign` edges connected to the stroke
+/// `pts` (through shared ends, edge after edge), kept only when they close a loop: the
+/// regions their insertion bounds; `s` is left as it was when there are none.
+fn import_connected(
+    s: &mut Sketch,
+    plane: &Plane,
+    pts: &[DVec3],
+    foreign: &[(DVec3, DVec3)],
+) -> Vec<RegionId> {
+    let near = |p: DVec3, q: DVec3| p.distance(q) <= PLANARITY;
+    let mut reach: Vec<DVec3> = pts.to_vec();
+    let mut used = vec![false; foreign.len()];
+    let mut picked = Vec::new();
+    loop {
+        let mut grew = false;
+        for (i, &(a, b)) in foreign.iter().enumerate() {
+            if used[i] || !reach.iter().any(|&r| near(r, a) || near(r, b)) {
+                continue;
+            }
+            used[i] = true;
+            picked.push((a, b));
+            reach.push(a);
+            reach.push(b);
+            grew = true;
+        }
+        if !grew {
+            break;
+        }
+    }
+    if picked.is_empty() {
+        return Vec::new();
+    }
+    let mut trial = s.clone();
+    let mut regions = Vec::new();
+    for (a, b) in picked {
+        let (la, lb) = (plane.to_local(a), plane.to_local(b));
+        if let (Some(va), Some(vb)) = (trial.vertex_at(la), trial.vertex_at(lb))
+            && (va == vb || trial.has_edge(va, vb))
+        {
+            continue;
+        }
+        if let Ok(more) = trial.insert_segment(la, lb) {
+            regions.extend(more);
+        }
+    }
+    if regions.is_empty() {
+        return Vec::new();
+    }
+    *s = trial;
+    regions.sort();
+    regions.dedup();
+    regions
 }
