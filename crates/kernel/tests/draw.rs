@@ -474,3 +474,70 @@ fn one_line_closes_a_face_with_edges_of_three_other_sketches() {
         "{out:?}"
     );
 }
+
+/// sketchcraft E-19: the last edge of a box, the top of its front, closes the roof and the
+/// front wall at once: both become faces (as in SketchUp).
+#[test]
+fn one_line_closing_two_loops_makes_both_faces() {
+    let mut m = Model::with_ground_sketch();
+    let draw =
+        |m: &mut Model, origin: [f64; 3], normal: [f64; 3], points: Vec<[f64; 3]>, closed: bool| {
+            m.apply(&Op::Draw {
+                target: DrawTarget::Plane { origin, normal },
+                points,
+                closed,
+                curve: None,
+            })
+            .unwrap()
+        };
+    // The front's foot on the ground; the side walls and the back wall, closed.
+    draw(
+        &mut m,
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+        vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
+        false,
+    );
+    for x in [0.0, 1.0] {
+        draw(
+            &mut m,
+            [x, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            vec![[x, 0.0, 0.0], [x, 0.0, 1.0], [x, 1.0, 1.0], [x, 1.0, 0.0]],
+            true,
+        );
+    }
+    draw(
+        &mut m,
+        [0.0, 1.0, 0.0],
+        [0.0, 1.0, 0.0],
+        vec![
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [0.0, 1.0, 1.0],
+        ],
+        true,
+    );
+    // The top of the front, drawn on the roof's plane.
+    let out = draw(
+        &mut m,
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0],
+        vec![[0.0, 0.0, 1.0], [1.0, 0.0, 1.0]],
+        false,
+    );
+    assert!(
+        matches!(out, OpOutcome::Drawn { ref regions, .. } if regions.len() == 1),
+        "the roof: {out:?}"
+    );
+    let front = m
+        .sketches()
+        .into_iter()
+        .find(|(_, s)| {
+            s.plane().normal.y.abs() > 1.0 - 1e-9
+                && s.plane().signed_distance(glam::DVec3::ZERO).abs() < 1e-9
+        })
+        .map(|(_, s)| s.region_count());
+    assert_eq!(front, Some(1), "the front wall is a face too");
+}

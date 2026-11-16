@@ -4225,18 +4225,24 @@ impl Model {
             regions.extend(more);
             regions.sort();
             regions.dedup();
+        }
+        if !(relocate && straight(pts)) {
             return Ok((sid, regions));
         }
-        if relocate && regions.is_empty() && straight(pts) {
-            if let Some((k, rs)) = self.close_on_another_plane(sid, pts, parent, &before) {
-                let emptied = before.edge_count() == 0 && self.sketch_order.first() != Some(&sid);
-                self.sketches[sid] = before;
-                if emptied {
-                    self.sketches.remove(sid);
-                    self.sketch_order.retain(|&x| x != sid);
-                }
-                return Ok((k, rs));
+        // A straight line may close loops on other planes too (an edge closing a roof and
+        // a wall at once makes both faces, as in SketchUp).
+        let others = self.close_on_other_planes(sid, pts, parent, &before);
+        if regions.is_empty()
+            && let Some((k, rs)) = others.first().cloned()
+        {
+            // It closed nothing where it was drawn: it lives only where it closes.
+            let emptied = before.edge_count() == 0 && self.sketch_order.first() != Some(&sid);
+            self.sketches[sid] = before;
+            if emptied {
+                self.sketches.remove(sid);
+                self.sketch_order.retain(|&x| x != sid);
             }
+            return Ok((k, rs));
         }
         Ok((sid, regions))
     }
@@ -4274,22 +4280,23 @@ impl Model {
         out
     }
 
-    /// sketchcraft E-19: a straight stroke that closed nothing where it was drawn: the
-    /// planes through it and an edge of another sketch touching one of its ends, in turn;
-    /// on the first where it closes a loop (with the edges there connected to it), it is
-    /// drawn into that plane's sketch (made if need be). `sid` is left out (`before` is
-    /// what it holds without the stroke).
-    fn close_on_another_plane(
+    /// sketchcraft E-19: a straight stroke: the planes through it and an edge of another
+    /// sketch touching one of its ends, in turn; on each where it closes a loop (with the
+    /// edges there connected to it), it is drawn into that plane's sketch (made if need
+    /// be). `sid` is left out (`before` is what it holds without the stroke). Returns
+    /// those sketches and the regions closed there.
+    fn close_on_other_planes(
         &mut self,
         sid: SketchId,
         pts: &[DVec3],
         parent: Option<crate::ids::NodeId>,
         before: &Sketch,
-    ) -> Option<(SketchId, Vec<RegionId>)> {
+    ) -> Vec<(SketchId, Vec<RegionId>)> {
+        let mut closed_on = Vec::new();
         let (a, b) = (pts[0], pts[pts.len() - 1]);
         let d = (b - a).normalize_or_zero();
         if d == DVec3::ZERO {
-            return None;
+            return closed_on;
         }
         let own = *self.sketches[sid].plane();
         let mut tried: Vec<DVec3> = vec![own.normal];
@@ -4378,9 +4385,9 @@ impl Model {
                     k
                 }
             };
-            return Some((k, rs));
+            closed_on.push((k, rs));
         }
-        None
+        closed_on
     }
 
     /// The object and the ordinal of its face with persistent id `face`.
