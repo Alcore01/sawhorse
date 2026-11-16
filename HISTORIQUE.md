@@ -186,3 +186,15 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : le test neuf échoue sans le changement (« On Guide ») et passe ; `cargo test --workspace` : 703 passés (702 + 1), 3 ignorés, aucun échec. Niveau : testé (noyau) ; essai dans le navigateur par JC à faire.
 - Limites connues : seulement les deux derniers points survolés, et leurs alignements le long des axes.
+
+## H-20261116-13 · correction · interface · Rapporteur : angle négatif tapé (E-22)
+
+- Origine : JC, 16 nov. 2026, 16 h 43 : « il ne supporte pas les entrées manuelle avec un chiffre négatif », avec une capture : curseur à « -30° (57.7%) », « -37 » tapé ; E-22.
+- Constat : `ProtractorTool.onValue` multipliait toujours l'angle tapé par le signe du côté du curseur : avec le curseur côté négatif, « -37 » devenait +37°, de l'autre côté de la référence. Reproduit par un test.
+- Fichiers : `src/tools/protractor.ts` (un angle tapé négatif est pris tel quel, signé comme l'étiquette ; un angle positif va du côté du curseur, comme avant) ; `src/tools/protractor.test.ts` (1 test, curseur d'un côté puis de l'autre).
+- Correction : « -37 » place la ligne de construction à -37°, comme l'étiquette le montre.
+- Effet sur les résultats : seulement les angles tapés négatifs.
+- Effet sur les projets existants : aucun.
+- Confidentialité : non.
+- Vérification : le test neuf échoue sans le changement et passe ; suite complète : 900 passés (899 + 1), 253 ignorés, aucun échec. Niveau : testé ; essai par JC à faire.
+- Limites connues : une pente négative (« -70% », « -1:2 ») suit la même règle.

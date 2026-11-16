@@ -59,6 +59,21 @@ describe("Protractor tool", () => {
     close(lastOp(h).dir as V3, [Math.cos(a), -Math.sin(a), 0]);
   });
 
+  it("a negative typed angle is taken as signed, as the live label shows it (sketchcraft E-22)", async () => {
+    for (const cursorY of [-0.3, 0.3]) {
+      const h = fakeHost({ outcome: { kind: "guide_added", guide: 1 } });
+      const t = new ProtractorTool(h);
+      t.onEvent(ev("click", [0, 0, 0], { snapKind: "endpoint" }));
+      t.onEvent(ev("click", [1, 0, 0], { snapKind: "axis-x" }));
+      t.onEvent(ev("move", [1, cursorY, 0], { snapKind: "free" }));
+      t.onValue("-37");
+      await tick();
+      const a = 37 * DEG;
+      // Wherever the cursor is, -37 is the clockwise side (negative y here), as the label says.
+      close(lastOp(h).dir as V3, [Math.cos(a), -Math.sin(a), 0]);
+    }
+  });
+
   it("locked upright facing green, a 1:2 roof pitch rises from the eaves line", async () => {
     const h = fakeHost({ outcome: { kind: "guide_added", guide: 1 } });
     const t = new ProtractorTool(h);

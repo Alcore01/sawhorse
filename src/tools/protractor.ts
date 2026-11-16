@@ -170,8 +170,10 @@ export class ProtractorTool extends Tool {
     const g = this.g;
     if (!g) return void h.status("Click the vertex and the reference line first, then type the angle.", true);
     if (!g.ref) g.ref = alignedFrame(g.vertex, g.normal).u;
-    // The side of the reference the cursor is on (the sign of its angle); a negative typed
-    // angle turns the other way from there.
+    // E-22: a negative typed angle is signed as the live label is (-30°: the clockwise side
+    // seen as the protractor is drawn) and taken as it is; a positive one goes on the side
+    // of the reference the cursor is on.
+    if (deg < 0) return void this.place(deg * DEG);
     const sign = g.angle < 0 ? -1 : 1;
     void this.place(sign * deg * DEG);
   }
