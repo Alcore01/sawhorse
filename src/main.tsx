@@ -21,6 +21,16 @@ try {
   /* no location in some hosts */
 }
 
+// sketchcraft E-34: installable on a tablet (manifest.webmanifest) and usable offline: the
+// built web app registers its service worker; the dev server and the desktop app do not.
+if (import.meta.env.PROD && "serviceWorker" in navigator && window.isSecureContext && !("__TAURI_INTERNALS__" in window)) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+      /* offline use only: the app works without it */
+    });
+  });
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

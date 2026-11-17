@@ -1,0 +1,16 @@
+{
+  "name": "VolumeCraft",
+  "short_name": "VolumeCraft",
+  "description": "Building massing on Sawhorse, a free, local-first push/pull 3D modeler.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f3ef",
+  "theme_color": "#2c5fa8",
+  "icons": [
+    { "src": "icons/icon-128.png", "sizes": "128x128", "type": "image/png" },
+    { "src": "icons/icon-256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

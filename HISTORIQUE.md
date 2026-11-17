@@ -339,3 +339,15 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Effet sur les résultats, les projets : aucun ; les fichiers .shz s'ouvrent comme avant. L'app de bureau construite aura le nom VolumeCraft (chemin d'installation Tauri différent).
 - Confidentialité : non.
 - Vérification : vitest 1180 réussis, `tsc -b` et build propres ; e2e mis à jour mais non lancés ici. Lanceur existant : le nom affiché change après réinstallation (`install-linux.sh`), la commande reste `sketchcraft`.
+
+## H-20261117-11 · évolution · interface · Tablette Android : application installable et touches à l'écran (E-34, première partie)
+
+- Origine : JC (17 nov. 2026, 10 h 40) : « il faudrait une version compatible android » ; 10 h 42 : « android tablette avec pen ou souris » ; E-34.
+- Constat : le stylet et la souris arrivent déjà aux outils comme une souris (seul le doigt est pris par la navigation : un doigt tourne, deux déplacent et zooment). Manquaient : les touches (Esc, Entrée, flèches d'axe, Maj, Ctrl+Z), l'installation et l'usage sans réseau.
+- Fichiers : `src/components/KeyBar.tsx` (barre de touches : chaque bouton envoie la touche qu'enverrait un clavier) et son test ; `src/App.tsx` (Affichage > On-screen Keys, gardé par visiteur, mis tout seul au premier appui d'un stylet ou d'un doigt ; dépendances du menu complétées avec les fonctions de E-28 et E-30) ; `src/styles/app.css` ; `public/manifest.webmanifest`, `public/sw.js`, `public/icons/` (copies des icônes de `src-tauri/icons`) ; `index.html` (manifeste, couleur) ; `src/main.tsx` (service worker enregistré seulement par la version construite, en contexte sécurisé, hors application de bureau).
+- Évolution : sur tablette, une barre Esc, ↵, X (rouge), Y (vert), Z (bleu), ∥, ⇧ (maintenu jusqu'au prochain appui), ↶ (annuler). L'application web devient installable et utilisable hors ligne une fois servie en HTTPS.
+- Écarté : une application Android (APK, Tauri) : kit Android à installer chez JC, rien de plus pour l'usage visé. Un mode tactile complet (dessin au doigt, loupe) : non demandé (stylet ou souris).
+- Effet sur les résultats, les projets : aucun. Le serveur de développement et l'application de bureau n'enregistrent pas de service worker.
+- Confidentialité : non (rien ne quitte l'appareil ; le service worker ne met en cache que l'application elle-même).
+- Vérification : 1 test (les 9 boutons envoient les bonnes touches, Maj enfoncée puis relâchée, fermeture) ; vitest 1181 réussis ; `tsc -b`, build et contrôles de provenance propres ; `dist` contient le manifeste, `sw.js` et les icônes. Niveau : testé (banc : 1 scénario). Non vérifié : sur une vraie tablette (installation, hors ligne, stylet, survol du stylet pour l'accrochage), le rendu de la barre.
+- Limites connues : il faut un hébergement HTTPS pour installer (à décider avec JC) ; l'accrochage par survol dépend d'un stylet qui signale le survol (S Pen, par exemple) ; sans survol, les points de référence ne se mémorisent pas.

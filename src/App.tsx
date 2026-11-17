@@ -71,6 +71,7 @@ import { ImportReport, type Report } from "./components/ImportReport";
 import { NameDialog, type NameRequest } from "./components/NameDialog";
 import { parseAlong } from "./lib/extrudeAlong";
 import { APP_NAME } from "./lib/brand";
+import { KeyBar } from "./components/KeyBar";
 import { SceneTabs } from "./components/SceneTabs";
 import { SheetsWorkspace } from "./sheets/SheetsWorkspace";
 import { ModeSwitch, type WorkMode } from "./sheets/SheetTabs";
@@ -183,6 +184,25 @@ function loadSnapGrid(): boolean {
     return localStorage.getItem(SNAP_GRID_KEY) === "1";
   } catch {
     return false;
+  }
+}
+
+/** sketchcraft E-34: View > On-screen Keys, per viewer ("1" on, "0" off, unset: comes on
+ * by itself when a pen or a finger first touches the app). */
+const KEY_BAR_KEY = "volumecraft.keyBar";
+function loadKeyBar(): boolean | null {
+  try {
+    const v = localStorage.getItem(KEY_BAR_KEY);
+    return v === "1" ? true : v === "0" ? false : null;
+  } catch {
+    return null;
+  }
+}
+function saveKeyBar(on: boolean): void {
+  try {
+    localStorage.setItem(KEY_BAR_KEY, on ? "1" : "0");
+  } catch {
+    // Lasts this visit.
   }
 }
 
@@ -438,6 +458,15 @@ export function App() {
   const [viewSeq, setViewSeq] = useState(0);
   const [projection, setProjection] = useState<Projection>("parallel");
   const [snapGrid, setSnapGrid] = useState<boolean>(loadSnapGrid);
+  const [keyBar, setKeyBar] = useState<boolean | null>(loadKeyBar);
+  useEffect(() => {
+    if (keyBar !== null) return;
+    const first = (e: PointerEvent) => {
+      if (e.pointerType === "pen" || e.pointerType === "touch") setKeyBar(true);
+    };
+    window.addEventListener("pointerdown", first);
+    return () => window.removeEventListener("pointerdown", first);
+  }, [keyBar]);
   const snapGridRef = useRef(snapGrid);
   snapGridRef.current = snapGrid;
   const [snapOff, setSnapOff] = useState<string[]>(loadSnapOff);
@@ -3003,6 +3032,16 @@ export function App() {
         { label: "Perspective", checked: projection === "perspective", onSelect: () => setProjection((p) => (p === "perspective" ? "parallel" : "perspective")) },
         { label: "Grid", checked: gridShown(st?.style), title: "Show or hide the ground grid (saved with the document and with each scene)", onSelect: () => setGrid(!gridShown(st?.style)) },
         {
+          label: "On-screen Keys",
+          checked: keyBar === true,
+          title: "Esc, Enter, the axis locks, Shift and Undo as buttons over the view, for a tablet with a pen",
+          onSelect: () => {
+            const next = keyBar !== true;
+            setKeyBar(next);
+            saveKeyBar(next);
+          },
+        },
+        {
           label: "Snap to Grid",
           checked: snapGrid,
           title: "Snap to the ground grid's points, and round lengths drawn with the mouse to grid steps (off: as SketchUp; typed values are exact either way)",
@@ -3051,7 +3090,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;
@@ -3218,6 +3257,14 @@ export function App() {
           setEngineObj(e);
         }}
       />
+      {keyBar === true && mode === "model" ? (
+        <KeyBar
+          onClose={() => {
+            setKeyBar(false);
+            saveKeyBar(false);
+          }}
+        />
+      ) : null}
       <SidePanel
         credits={credits}
         renderOn={renderOn}
