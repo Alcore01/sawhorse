@@ -4559,6 +4559,70 @@ impl Model {
     }
 }
 
+/// sketchcraft E-19: whether the points lie on one straight line.
+fn straight(pts: &[DVec3]) -> bool {
+    let (a, b) = (pts[0], pts[pts.len() - 1]);
+    let d = b - a;
+    d.length() > PLANARITY
+        && pts
+            .iter()
+            .all(|&p| d.cross(p - a).length() <= PLANARITY * d.length())
+}
+
+/// sketchcraft E-19: into `s` (on `plane`), the `foreign` edges connected to the stroke
+/// `pts` (through shared ends, edge after edge), kept only when they close a loop: the
+/// regions their insertion bounds; `s` is left as it was when there are none.
+fn import_connected(
+    s: &mut Sketch,
+    plane: &Plane,
+    pts: &[DVec3],
+    foreign: &[(DVec3, DVec3)],
+) -> Vec<RegionId> {
+    let near = |p: DVec3, q: DVec3| p.distance(q) <= PLANARITY;
+    let mut reach: Vec<DVec3> = pts.to_vec();
+    let mut used = vec![false; foreign.len()];
+    let mut picked = Vec::new();
+    loop {
+        let mut grew = false;
+        for (i, &(a, b)) in foreign.iter().enumerate() {
+            if used[i] || !reach.iter().any(|&r| near(r, a) || near(r, b)) {
+                continue;
+            }
+            used[i] = true;
+            picked.push((a, b));
+            reach.push(a);
+            reach.push(b);
+            grew = true;
+        }
+        if !grew {
+            break;
+        }
+    }
+    if picked.is_empty() {
+        return Vec::new();
+    }
+    let mut trial = s.clone();
+    let mut regions = Vec::new();
+    for (a, b) in picked {
+        let (la, lb) = (plane.to_local(a), plane.to_local(b));
+        if let (Some(va), Some(vb)) = (trial.vertex_at(la), trial.vertex_at(lb))
+            && (va == vb || trial.has_edge(va, vb))
+        {
+            continue;
+        }
+        if let Ok(more) = trial.insert_segment(la, lb) {
+            regions.extend(more);
+        }
+    }
+    if regions.is_empty() {
+        return Vec::new();
+    }
+    *s = trial;
+    regions.sort();
+    regions.dedup();
+    regions
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5027,68 +5091,4 @@ mod tests {
         assert_eq!(got.hash(), want.hash());
         assert_eq!(got_out, want_out);
     }
-}
-
-/// sketchcraft E-19: whether the points lie on one straight line.
-fn straight(pts: &[DVec3]) -> bool {
-    let (a, b) = (pts[0], pts[pts.len() - 1]);
-    let d = b - a;
-    d.length() > PLANARITY
-        && pts
-            .iter()
-            .all(|&p| d.cross(p - a).length() <= PLANARITY * d.length())
-}
-
-/// sketchcraft E-19: into `s` (on `plane`), the `foreign` edges connected to the stroke
-/// `pts` (through shared ends, edge after edge), kept only when they close a loop: the
-/// regions their insertion bounds; `s` is left as it was when there are none.
-fn import_connected(
-    s: &mut Sketch,
-    plane: &Plane,
-    pts: &[DVec3],
-    foreign: &[(DVec3, DVec3)],
-) -> Vec<RegionId> {
-    let near = |p: DVec3, q: DVec3| p.distance(q) <= PLANARITY;
-    let mut reach: Vec<DVec3> = pts.to_vec();
-    let mut used = vec![false; foreign.len()];
-    let mut picked = Vec::new();
-    loop {
-        let mut grew = false;
-        for (i, &(a, b)) in foreign.iter().enumerate() {
-            if used[i] || !reach.iter().any(|&r| near(r, a) || near(r, b)) {
-                continue;
-            }
-            used[i] = true;
-            picked.push((a, b));
-            reach.push(a);
-            reach.push(b);
-            grew = true;
-        }
-        if !grew {
-            break;
-        }
-    }
-    if picked.is_empty() {
-        return Vec::new();
-    }
-    let mut trial = s.clone();
-    let mut regions = Vec::new();
-    for (a, b) in picked {
-        let (la, lb) = (plane.to_local(a), plane.to_local(b));
-        if let (Some(va), Some(vb)) = (trial.vertex_at(la), trial.vertex_at(lb))
-            && (va == vb || trial.has_edge(va, vb))
-        {
-            continue;
-        }
-        if let Ok(more) = trial.insert_segment(la, lb) {
-            regions.extend(more);
-        }
-    }
-    if regions.is_empty() {
-        return Vec::new();
-    }
-    *s = trial;
-    regions.sort();
-    regions.dedup();
-    regions
 }
