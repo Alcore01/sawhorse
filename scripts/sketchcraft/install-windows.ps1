@@ -101,7 +101,7 @@ foreach ($s in $Shortcuts) {
   $l.TargetPath = $launcher
   $l.WorkingDirectory = $Dest
   $l.IconLocation = (Join-Path $Dest 'sketchcraft.ico') + ',0'
-  $l.Description = 'sketchcraft : modeleur 3D pour les volumetries de batiments'
+  $l.Description = 'VolumeCraft : modeleur 3D pour les volumetries de batiments'
   $l.WindowStyle = 7
   $l.Save()
   Write-Host "raccourci : $s"

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "./glyphs";
+import { APP_CREDIT, APP_NAME } from "../lib/brand";
 import { BAR_VIEWS, type ViewId } from "../viewport/camera";
 
 // "Plugins" (lane 11) sits after Tools: commands from enabled plugins, and managing them.
@@ -107,9 +108,9 @@ export function TopBar({ view, onView, credits, showCredits = true, creditsState
 
   return (
     <header className="top">
-      <div className="brand" title="Sawhorse">
+      <div className="brand" title={APP_CREDIT}>
         <BrandMark />
-        Sawhorse
+        {APP_NAME}
       </div>
       <nav className="menu" aria-label="Menu" ref={navRef}>
         {MENUS.map((m) => {

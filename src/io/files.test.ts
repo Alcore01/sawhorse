@@ -71,7 +71,7 @@ describe("asking before discarding", () => {
     let settled = false;
     void asked.then(() => (settled = true));
     // The plugin is loaded on demand, so the question reaches it a few ticks later.
-    await vi.waitFor(() => expect(dialog.confirm).toHaveBeenCalledWith("Discard the unsaved changes to this model?", expect.objectContaining({ title: "Sawhorse" })));
+    await vi.waitFor(() => expect(dialog.confirm).toHaveBeenCalledWith("Discard the unsaved changes to this model?", expect.objectContaining({ title: "VolumeCraft" })));
     await new Promise((r) => setTimeout(r, 20));
     expect(settled).toBe(false);
     answer!(false);

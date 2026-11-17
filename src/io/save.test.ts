@@ -82,7 +82,7 @@ describe("saving in the desktop app", () => {
     core.invoke.mockRejectedValueOnce("exists:cabinet.shz");
     dialog.confirm.mockResolvedValue(false);
     expect(await saveFile("Untitled.shz", bytes, SHZ)).toBeNull();
-    expect(dialog.confirm).toHaveBeenCalledWith("cabinet.shz already exists. Replace it?", expect.objectContaining({ title: "Sawhorse" }));
+    expect(dialog.confirm).toHaveBeenCalledWith("cabinet.shz already exists. Replace it?", expect.objectContaining({ title: "VolumeCraft" }));
     expect(core.invoke).toHaveBeenCalledOnce();
     expect(core.invoke.mock.calls[0][2].headers).not.toHaveProperty("x-replace");
   });

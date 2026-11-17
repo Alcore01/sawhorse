@@ -65,7 +65,7 @@ afterEach(() => {
 describe("the question's words", () => {
   it("are one text: as it is for New, Open and Close, with what happens to the window for closing it", () => {
     expect(discardQuestion()).toBe("Discard the unsaved changes to this model?");
-    expect(discardQuestion(true)).toBe("Discard the unsaved changes to this model and close Sawhorse?");
+    expect(discardQuestion(true)).toBe("Discard the unsaved changes to this model and close VolumeCraft?");
   });
 });
 
@@ -81,7 +81,7 @@ describe("a close request in the desktop app", () => {
   it("with unsaved changes asks, and No keeps the window, the model and the autosave", async () => {
     const t = setup({ answer: false });
     await t.handle();
-    expect(t.asked).toEqual(["Discard the unsaved changes to this model and close Sawhorse?"]);
+    expect(t.asked).toEqual(["Discard the unsaved changes to this model and close VolumeCraft?"]);
     expect(t.s.said).toEqual(["keep"]);
     expect(t.discard).not.toHaveBeenCalled();
     expect(t.failures).toEqual([]);
@@ -134,7 +134,7 @@ describe("a close request in the desktop app", () => {
     });
     await t.handle();
     expect(t.s.said).toEqual(["failed"]);
-    expect(t.failures).toEqual(["Sawhorse could not ask about the unsaved changes (no dialog). Close the window again to close it without saving, or save first."]);
+    expect(t.failures).toEqual(["VolumeCraft could not ask about the unsaved changes (no dialog). Close the window again to close it without saving, or save first."]);
     expect(t.discard).not.toHaveBeenCalled();
   });
 
@@ -202,12 +202,12 @@ describe("a close request in the desktop app", () => {
     expect(t.s.said).toEqual(["failed", "keep"]);
   });
 
-  it("by default asks with the desktop's message dialog, titled Sawhorse, and waits for it", async () => {
+  it("by default asks with the desktop's message dialog, titled VolumeCraft, and waits for it", async () => {
     (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
     dialog.confirm.mockImplementation(() => new Promise((r) => setTimeout(() => r(false), 300)));
     const s = shell();
     await closeHandler({ shell: s, unsaved: () => true, discard: async () => {}, failed: () => {} })();
-    expect(dialog.confirm).toHaveBeenCalledWith("Discard the unsaved changes to this model and close Sawhorse?", expect.objectContaining({ title: "Sawhorse", kind: "warning" }));
+    expect(dialog.confirm).toHaveBeenCalledWith("Discard the unsaved changes to this model and close VolumeCraft?", expect.objectContaining({ title: "VolumeCraft", kind: "warning" }));
     expect(s.said).toEqual(["keep"]);
   });
 });

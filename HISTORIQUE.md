@@ -329,3 +329,13 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Origine : JC (17 nov. 2026, 09 h 26) : « dans les vues il manque "left" , je placerai perspective et isométrique en premier dans la liste c'est plus logique » ; E-32.
 - Fichiers : `src/viewport/camera.ts` (ordre de `VIEWS`, Left n'est plus réservée au menu) ; `src/viewport/camera.test.ts`, `src/App.test.tsx` (ordre attendu).
 - Vérification : vitest 1180 réussis, `tsc -b` et build propres. Les e2e Playwright cliquent les boutons par leur nom (pas d'effet attendu), non lancés ici. La vue au démarrage reste Iso.
+
+## H-20261117-10 · évolution · interface|documentation · Le programme s'appelle VolumeCraft (E-33)
+
+- Origine : JC (17 nov. 2026, 09 h 51) : « changer le nom du programme volumecraft , archicraft , Geocraft, Alphasketch .... » ; 09 h 52, après l'avis de Claude : « VolumeCraft donc seulement le programme » ; E-33.
+- Fichiers : `src/lib/brand.ts` (nouveau : `APP_NAME`, `APP_CREDIT`) ; `index.html` (titre, description) ; `src/components/TopBar.tsx` (logo ; info-bulle « VolumeCraft, built on Sawhorse (MIT OR Apache-2.0) ») ; `src/App.tsx` (titre de fenêtre, fichier non ouvrable, Fermer) ; `src/lib/platform.ts` (Quit sur macOS) ; `src/io/closing.ts`, `src/io/files.ts` (question avant de perdre les changements) ; `src-tauri/tauri.conf.json` (productName, titre, description ; copyright inchangé) ; `scripts/sketchcraft/install-linux.sh` (Name=VolumeCraft), `install-windows.ps1` (description du raccourci) ; tests vitest et e2e (titres attendus).
+- Évolution : le nom affiché devient VolumeCraft. Restent « Sawhorse » : le dépôt et le fork GitHub, le format .shz (« Sawhorse document »), les extensions, le style « Sawhorse », les notices de licence et de copyright, et des messages techniques (limites de taille des fichiers, service de rendu, notes d'import .skp, PDF du débit), à reprendre si JC le souhaite.
+- Écarté : AlphaSketch (proche des marques SketchUp et Sketch), ArchiCraft (galvaudé selon JC, proche d'ArchiCAD), GeoCraft (préfixe très pris en géologie et SIG). Recherche de marque faite rapidement seulement : à vérifier (EUIPO) avant toute diffusion publique sous ce nom.
+- Effet sur les résultats, les projets : aucun ; les fichiers .shz s'ouvrent comme avant. L'app de bureau construite aura le nom VolumeCraft (chemin d'installation Tauri différent).
+- Confidentialité : non.
+- Vérification : vitest 1180 réussis, `tsc -b` et build propres ; e2e mis à jour mais non lancés ici. Lanceur existant : le nom affiché change après réinstallation (`install-linux.sh`), la commande reste `sketchcraft`.

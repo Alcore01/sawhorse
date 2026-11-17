@@ -61,64 +61,64 @@ test("the title bar follows the model: open, an edit's unsaved mark, File > Clos
   await desktopBridge(page, "Win32", { start: SHELF, files: { [SHELF]: shelf } });
   const vp = await ready(page);
   await expect(vp).toHaveAttribute("data-objects", "1");
-  await titled(page, "shelf - Sawhorse");
+  await titled(page, "shelf - VolumeCraft");
   await box(page, "24,16", "12");
   await expect(vp).toHaveAttribute("data-objects", "2");
-  await titled(page, "• shelf - Sawhorse");
+  await titled(page, "• shelf - VolumeCraft");
   await setBridge(page, { answer: "Ok" });
   await (await fileMenu(page)).getByText("Close", { exact: true }).click();
   await expect.poll(async () => (await bridge(page)).asked).toEqual([DISCARD_QUESTION]);
   await expect(vp).toHaveAttribute("data-objects", "0");
-  await titled(page, "Untitled - Sawhorse");
+  await titled(page, "Untitled - VolumeCraft");
   // Only titles the page itself had, in the order it had them.
-  expect(await sent(page)).toEqual(["Untitled - Sawhorse", "shelf - Sawhorse", "• shelf - Sawhorse", "Untitled - Sawhorse"]);
+  expect(await sent(page)).toEqual(["Untitled - VolumeCraft", "shelf - VolumeCraft", "• shelf - VolumeCraft", "Untitled - VolumeCraft"]);
 });
 
 test("an untitled model: the mark comes with the first edit and goes with File > Close", async ({ page }) => {
   await desktopBridge(page);
   const vp = await ready(page);
-  await titled(page, "Untitled - Sawhorse");
+  await titled(page, "Untitled - VolumeCraft");
   await box(page);
   await expect(vp).toHaveAttribute("data-objects", "1");
-  await titled(page, "• Untitled - Sawhorse");
+  await titled(page, "• Untitled - VolumeCraft");
   // No keeps the model and the mark; OK closes it and the mark goes.
   await (await fileMenu(page)).getByText("Close", { exact: true }).click();
   await expect.poll(async () => (await bridge(page)).asked).toEqual([DISCARD_QUESTION]);
   await page.waitForTimeout(800);
   await expect(vp).toHaveAttribute("data-objects", "1");
-  await titled(page, "• Untitled - Sawhorse");
+  await titled(page, "• Untitled - VolumeCraft");
   await setBridge(page, { answer: "Ok" });
   await (await fileMenu(page)).getByText("Close", { exact: true }).click();
   await expect(vp).toHaveAttribute("data-objects", "0");
-  await titled(page, "Untitled - Sawhorse");
-  for (const t of (await bridge(page)).titles) expect(["Untitled - Sawhorse", "• Untitled - Sawhorse"]).toContain(t);
+  await titled(page, "Untitled - VolumeCraft");
+  for (const t of (await bridge(page)).titles) expect(["Untitled - VolumeCraft", "• Untitled - VolumeCraft"]).toContain(t);
 });
 
 test("a title the shell cannot set is never mentioned, and the page's own title still follows", async ({ page }) => {
   await desktopBridge(page);
   const vp = await ready(page);
-  await titled(page, "Untitled - Sawhorse");
+  await titled(page, "Untitled - VolumeCraft");
   await setBridge(page, { titleFails: true });
   const hint = page.locator("#hint");
   await box(page);
   await expect(vp).toHaveAttribute("data-objects", "1");
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
   await expect.poll(async () => (await bridge(page)).log.filter((c) => c === "window_title").length).toBeGreaterThan(1);
   await page.waitForTimeout(300);
   await expect(hint).toContainText("Extruded");
   await expect(hint).not.toContainText("window_title");
   await expect(hint).not.toContainText("Can't do that");
-  expect((await bridge(page)).titles).toEqual(["Untitled - Sawhorse"]);
+  expect((await bridge(page)).titles).toEqual(["Untitled - VolumeCraft"]);
 });
 
 test("the browser build never calls the shell for its title", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const vp = await ready(page);
-  await expect(page).toHaveTitle("Untitled - Sawhorse");
+  await expect(page).toHaveTitle("Untitled - VolumeCraft");
   await box(page);
   await expect(vp).toHaveAttribute("data-objects", "1");
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
   expect(await page.evaluate(() => "__TAURI_INTERNALS__" in window)).toBe(false);
   expect(errors).toEqual([]);
 });

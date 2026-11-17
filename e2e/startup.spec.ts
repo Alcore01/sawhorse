@@ -85,7 +85,7 @@ test("a .shz the app was started with opens: its name in the title and the statu
   const vp = await started(page, SHELF);
   await expect(vp).toHaveAttribute("data-objects", "1");
   await expect(vp).toHaveAttribute("data-hash", shelfHash);
-  await expect(page).toHaveTitle("shelf - Sawhorse");
+  await expect(page).toHaveTitle("shelf - VolumeCraft");
   await expect(page.locator("#hint")).toContainText("Opened shelf.shz");
   const b = await bridge(page);
   expect(await asked(page)).toBe(1);
@@ -99,7 +99,7 @@ test("a .shz the app was started with opens: its name in the title and the statu
 
 test("with no start-up file the app starts as it always has", async ({ page }) => {
   const vp = await started(page, null);
-  await expect(page).toHaveTitle("Untitled - Sawhorse");
+  await expect(page).toHaveTitle("Untitled - VolumeCraft");
   await expect(vp).toHaveAttribute("data-objects", "0");
   await expect.poll(() => asked(page)).toBe(1);
   const b = await bridge(page);
@@ -110,7 +110,7 @@ test("with no start-up file the app starts as it always has", async ({ page }) =
 
 test("the start-up file is asked for once: a reload of the page does not open it again", async ({ page }) => {
   const vp = await started(page, SHELF);
-  await expect(page).toHaveTitle("shelf - Sawhorse");
+  await expect(page).toHaveTitle("shelf - VolumeCraft");
   await box(page, "24,16", "12");
   await expect(vp).toHaveAttribute("data-objects", "2");
   await expect.poll(() => slot(page, "current-meta")).not.toBe(null);
@@ -122,7 +122,7 @@ test("the start-up file is asked for once: a reload of the page does not open it
   await expect(page.locator("#hint")).toContainText("Restore unsaved work? 2 solids");
   await expect(page.locator("#hint")).not.toContainText("opens after you answer");
   await expect(vp).toHaveAttribute("data-objects", "0");
-  await expect(page).toHaveTitle("Untitled - Sawhorse");
+  await expect(page).toHaveTitle("Untitled - VolumeCraft");
   const b = await bridge(page);
   expect(b.allowed).toEqual([]);
   expect(b.reads).toEqual([]);
@@ -133,7 +133,7 @@ test("a start-up file that cannot be read says what a failed drop says, and the 
   const hint = page.locator("#hint");
   await expect(hint).toContainText("cannot find the file");
   const said = (await hint.innerText()).trim();
-  await expect(page).toHaveTitle("Untitled - Sawhorse");
+  await expect(page).toHaveTitle("Untitled - VolumeCraft");
   await expect(vp).toHaveAttribute("data-objects", "0");
   await box(page);
   await expect(vp).toHaveAttribute("data-objects", "1");
@@ -159,7 +159,7 @@ async function lastRunThenShelf(page: Page) {
   await expect(hint).toContainText("shelf.shz opens after you answer.");
   // The file waits: the model is the empty one, and the file has not even been read.
   await expect(vp).toHaveAttribute("data-objects", "0");
-  await expect(page).toHaveTitle("Untitled - Sawhorse");
+  await expect(page).toHaveTitle("Untitled - VolumeCraft");
   expect(await asked(page)).toBe(1);
   expect((await bridge(page)).reads).toEqual([]);
   // The last run's work is set aside, and nothing of this start is saved over it, however long
@@ -176,7 +176,7 @@ test("unsaved work from the last run is offered first; Restore brings it back an
   await expect(vp).toHaveAttribute("data-objects", "1");
   await expect(vp).toHaveAttribute("data-hash", work);
   await expect(hint).toContainText("Restored your unsaved work: 1 solid, 3 steps (undo works as before). shelf.shz is not open yet.");
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
   expect((await bridge(page)).reads).toEqual([]);
   // Opening the file asks about the restored work, as File > Open does: No keeps it.
   const open = hint.getByRole("button", { name: "Open shelf.shz" });
@@ -185,11 +185,11 @@ test("unsaved work from the last run is offered first; Restore brings it back an
   await expect.poll(async () => (await bridge(page)).asked).toEqual([DISCARD_QUESTION]);
   await page.waitForTimeout(600);
   await expect(vp).toHaveAttribute("data-hash", work);
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
   // Yes opens it in place of the work.
   await setBridge(page, { answer: "Ok" });
   await open.click();
-  await expect(page).toHaveTitle("shelf - Sawhorse");
+  await expect(page).toHaveTitle("shelf - VolumeCraft");
   await expect(vp).toHaveAttribute("data-hash", shelfHash);
   expect((await bridge(page)).asked).toEqual([DISCARD_QUESTION, DISCARD_QUESTION]);
 });
@@ -197,7 +197,7 @@ test("unsaved work from the last run is offered first; Restore brings it back an
 test("unsaved work from the last run is offered first; Discard deletes it and opens the file", async ({ page }) => {
   const { vp, hint } = await lastRunThenShelf(page);
   await hint.getByRole("button", { name: "Discard" }).click();
-  await expect(page).toHaveTitle("shelf - Sawhorse");
+  await expect(page).toHaveTitle("shelf - VolumeCraft");
   await expect(vp).toHaveAttribute("data-hash", shelfHash);
   await expect(hint).toContainText("Opened shelf.shz");
   // Nothing was unsaved, so nothing was asked.
@@ -212,6 +212,6 @@ test("unsaved work from the last run is offered first; Discard deletes it and op
 
 test("with the autosave off (?autosave=0) a start-up file opens at once", async ({ page }) => {
   const vp = await started(page, SHELF, "/?autosave=0");
-  await expect(page).toHaveTitle("shelf - Sawhorse");
+  await expect(page).toHaveTitle("shelf - VolumeCraft");
   await expect(vp).toHaveAttribute("data-hash", shelfHash);
 });

@@ -243,7 +243,7 @@ async function saveAndReopen(page: Page) {
   await page.getByRole("menuitem", { name: "New", exact: true }).click();
   await expect.poll(async () => (await solids(page)).length).toBe(0);
   await page.getByTestId("file-input").setInputFiles({ name: "cabinet.shz", mimeType: "application/octet-stream", buffer: bytes });
-  await expect(page).toHaveTitle("cabinet - Sawhorse");
+  await expect(page).toHaveTitle("cabinet - VolumeCraft");
   await expect(vp).toHaveAttribute("data-hash", hash!);
 }
 

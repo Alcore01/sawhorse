@@ -70,6 +70,7 @@ import type { ExportOptions, ImportUnit, OpOutcome } from "./kernel/types";
 import { ImportReport, type Report } from "./components/ImportReport";
 import { NameDialog, type NameRequest } from "./components/NameDialog";
 import { parseAlong } from "./lib/extrudeAlong";
+import { APP_NAME } from "./lib/brand";
 import { SceneTabs } from "./components/SceneTabs";
 import { SheetsWorkspace } from "./sheets/SheetsWorkspace";
 import { ModeSwitch, type WorkMode } from "./sheets/SheetTabs";
@@ -736,7 +737,7 @@ export function App() {
   dirtyRef.current = dirty;
   // Lane 39: in the desktop app the window's title bar shows the same text (src/io/title.ts).
   useEffect(() => {
-    void showTitle(`${dirty ? "• " : ""}${docName ? stem(docName) : "Untitled"} - Sawhorse`);
+    void showTitle(`${dirty ? "• " : ""}${docName ? stem(docName) : "Untitled"} - ${APP_NAME}`);
   }, [dirty, docName]);
 
   /** True when the model may be replaced: it has no unsaved changes, or the person says so. Awaited: the desktop's question is asynchronous. */
@@ -879,7 +880,7 @@ export function App() {
         const ext = extensionOf(f.name);
         if (ext === ".shz") await openBytes(f);
         else if (ALL_EXTENSIONS.includes(ext)) await importBytes(f);
-        else setMessage({ text: `${f.name}: not a file Sawhorse can open (use .shz, .skp, STL, 3MF, glTF, OBJ, DXF or SVG).`, error: true });
+        else setMessage({ text: `${f.name}: not a file ${APP_NAME} can open (use .shz, .skp, STL, 3MF, glTF, OBJ, DXF or SVG).`, error: true });
       }
     },
     [openBytes, importBytes],
@@ -891,7 +892,7 @@ export function App() {
     async (files: File[]) => {
       for (const f of files) {
         if (!ALL_EXTENSIONS.includes(extensionOf(f.name))) {
-          setMessage({ text: `${f.name}: not a file Sawhorse can open (use .shz, .skp, STL, 3MF, glTF, OBJ, DXF or SVG).`, error: true });
+          setMessage({ text: `${f.name}: not a file ${APP_NAME} can open (use .shz, .skp, STL, 3MF, glTF, OBJ, DXF or SVG).`, error: true });
           continue;
         }
         try {
@@ -2888,7 +2889,7 @@ export function App() {
               "-" as const,
               {
                 label: quitLabel(),
-                title: "Close Sawhorse (asks first if there are unsaved changes)",
+                title: `Close ${APP_NAME} (asks first if there are unsaved changes)`,
                 onSelect: () => void closeShell.say("exit").catch((e) => setMessage({ text: `Could not close the window: ${e instanceof Error ? e.message : String(e)}`, error: true })),
               },
             ]

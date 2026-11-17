@@ -15,6 +15,7 @@
 // answer, which means the dialog never showed) says "failed", after which the next close
 // request closes at once.
 import { askYesNo } from "./files";
+import { APP_NAME } from "../lib/brand";
 
 /** The event the shell sends when a close request finds unsaved changes. */
 export const CLOSE_REQUESTED = "sawhorse://close-requested";
@@ -27,7 +28,7 @@ const DISCARD = "Discard the unsaved changes to this model";
  * else happens, "and close Sawhorse".
  */
 export function discardQuestion(closing = false): string {
-  return `${DISCARD}${closing ? " and close Sawhorse" : ""}?`;
+  return `${DISCARD}${closing ? ` and close ${APP_NAME}` : ""}?`;
 }
 
 /** What the page says to the shell (the `close_guard` command; `sawhorse_close_guard::Say`). */
@@ -103,7 +104,7 @@ export function closeHandler(o: CloseOptions): () => Promise<void> {
     } catch (e) {
       const why = e instanceof Error ? e.message : String(e);
       try {
-        o.failed(`Sawhorse could not ask about the unsaved changes (${why}). Close the window again to close it without saving, or save first.`);
+        o.failed(`${APP_NAME} could not ask about the unsaved changes (${why}). Close the window again to close it without saving, or save first.`);
       } catch {
         /* the shell is told below either way */
       }

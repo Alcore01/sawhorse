@@ -114,7 +114,7 @@ DESKTOP_FILE="$APPS/sketchcraft.desktop"
 cat > "$DESKTOP_FILE" <<DESKTOP
 [Desktop Entry]
 Type=Application
-Name=sketchcraft
+Name=VolumeCraft
 Comment=Modeleur 3D pour les volumétries de bâtiments
 Exec=$BIN/sketchcraft
 Icon=$ICONS/sketchcraft.png

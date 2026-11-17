@@ -169,18 +169,18 @@ test("save as .shz, start a new model, open the file again", async ({ page }) =>
   const vp = await ready(page);
   await pick(page, "parts.stl", stlBoxes([{ at: [0, 0, 0], size: [40, 40, 40] }, { at: [100, 0, 0], size: [20, 30, 10] }]));
   await expect(vp).toHaveAttribute("data-objects", "2");
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
   const hash = await vp.getAttribute("data-hash");
   const saved = await download(page, () => page.keyboard.press("Control+s"));
   expect(saved.name).toBe("Untitled.shz");
   expect(saved.bytes.subarray(30, 38).toString()).toBe("mimetype");
-  await expect(page).toHaveTitle("Untitled - Sawhorse");
+  await expect(page).toHaveTitle("Untitled - VolumeCraft");
   await menu(page, "File", "New");
   await expect(vp).toHaveAttribute("data-objects", "0");
   await pick(page, "parts.shz", saved.bytes);
   await expect(vp).toHaveAttribute("data-objects", "2");
   await expect(vp).toHaveAttribute("data-hash", hash!);
-  await expect(page).toHaveTitle("parts - Sawhorse");
+  await expect(page).toHaveTitle("parts - VolumeCraft");
   // Nothing to undo in a freshly opened file.
   await expect(page.locator(".hud")).toContainText("undo 0");
 });
@@ -197,7 +197,7 @@ test("a save refused by its read-back check writes nothing and keeps the unsaved
   await pick(page, "parts.stl", stlBoxes([{ at: [0, 0, 0], size: [40, 40, 40] }, { at: [100, 0, 0], size: [20, 30, 10] }]));
   await expect(vp).toHaveAttribute("data-objects", "2");
   const hash = await vp.getAttribute("data-hash");
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
   const downloads: string[] = [];
   page.on("download", (d) => downloads.push(d.suggestedFilename()));
   await page.evaluate(() => (window as unknown as { __sawhorse: { kernelTest: { failNextSave(): void } } }).__sawhorse.kernelTest.failNextSave());
@@ -207,7 +207,7 @@ test("a save refused by its read-back check writes nothing and keeps the unsaved
   );
   expect(downloads).toEqual([]);
   // The work is all still there, unsaved, and undoable.
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
   await expect(vp).toHaveAttribute("data-objects", "2");
   await expect(vp).toHaveAttribute("data-hash", hash!);
   await expect(page.locator(".hud")).toContainText("undo 1");
@@ -216,7 +216,7 @@ test("a save refused by its read-back check writes nothing and keeps the unsaved
   expect(stl.bytes.length).toBeGreaterThan(84);
   // The next save writes the model, and it opens as the same one.
   const saved = await download(page, () => page.keyboard.press("Control+s"));
-  await expect(page).toHaveTitle("Untitled - Sawhorse");
+  await expect(page).toHaveTitle("Untitled - VolumeCraft");
   await menu(page, "File", "New");
   await expect(vp).toHaveAttribute("data-objects", "0");
   await pick(page, "parts.shz", saved.bytes);
@@ -241,18 +241,18 @@ test("over unsaved changes, Open and New wait for the answer, even the desktop's
   await pick(page, "parts.stl", stlBoxes([{ at: [0, 0, 0], size: [40, 40, 40] }]));
   await expect(vp).toHaveAttribute("data-objects", "1");
   const saved = await download(page, () => page.keyboard.press("Control+s"));
-  await expect(page).toHaveTitle("Untitled - Sawhorse");
+  await expect(page).toHaveTitle("Untitled - VolumeCraft");
   // An import adds to the model: unsaved changes.
   await pick(page, "more.stl", stlBoxes([{ at: [100, 0, 0], size: [20, 30, 10] }]));
   await expect(vp).toHaveAttribute("data-objects", "2");
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
 
   // Open over them: asked, and No keeps the model.
   await pick(page, "parts.shz", saved.bytes);
   await expect.poll(asked).toEqual(["Discard the unsaved changes to this model?"]);
   await page.waitForTimeout(500);
   await expect(vp).toHaveAttribute("data-objects", "2");
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
 
   // New over them: asked, and No keeps the model.
   await menu(page, "File", "New");
@@ -264,7 +264,7 @@ test("over unsaved changes, Open and New wait for the answer, even the desktop's
   await page.evaluate(() => ((window as unknown as { __answer: boolean }).__answer = true));
   await pick(page, "parts.shz", saved.bytes);
   await expect(vp).toHaveAttribute("data-objects", "1");
-  await expect(page).toHaveTitle("parts - Sawhorse");
+  await expect(page).toHaveTitle("parts - VolumeCraft");
   expect((await asked()).length).toBe(3);
 });
 

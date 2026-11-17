@@ -9,7 +9,7 @@ import { bridge, closeWindow, desktopBridge, setBridge } from "./tauri";
 // an unanswered question closes the window whatever the page does, is tested in
 // src-tauri/close-guard (cargo test -p sawhorse-close-guard).
 const requireKernel = !!process.env.REQUIRE_KERNEL;
-const CLOSE_QUESTION = "Discard the unsaved changes to this model and close Sawhorse?";
+const CLOSE_QUESTION = "Discard the unsaved changes to this model and close VolumeCraft?";
 const DISCARD_QUESTION = "Discard the unsaved changes to this model?";
 
 async function ready(page: Page, url = "/?autosave=0") {
@@ -28,7 +28,7 @@ async function dirty(page: Page, url?: string) {
   await expect.poll(async () => (await bridge(page)).said).toContain("saved");
   await box(page);
   await expect(vp).toHaveAttribute("data-objects", "1");
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
   await expect.poll(async () => (await bridge(page)).unsaved).toBe(true);
   return vp;
 }
@@ -69,10 +69,10 @@ test("the desktop File menu has Close next to Open and ends with Exit, named for
   expect(await page.evaluate(() => (window as unknown as { __tauriMock: { listeners(e: string): number } }).__tauriMock.listeners("tauri://close-requested"))).toBe(0);
 });
 
-test("on macOS the last item is Quit Sawhorse", async ({ page }) => {
+test("on macOS the last item is Quit VolumeCraft", async ({ page }) => {
   await desktopBridge(page, "MacIntel");
   await ready(page);
-  await expect((await fileMenu(page)).last()).toHaveText("Quit Sawhorse");
+  await expect((await fileMenu(page)).last()).toHaveText("Quit VolumeCraft");
 });
 
 test("the browser build has File > Close and no Exit (a page cannot close its tab)", async ({ page }) => {
@@ -110,7 +110,7 @@ test("over unsaved changes, No keeps the window, the model and the unsaved mark"
   expect(b.asked).toEqual([CLOSE_QUESTION]);
   expect(b.ended).toBeNull();
   await expect(vp).toHaveAttribute("data-objects", "1");
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
   // Asked again on the next close.
   await closeWindow(page);
   await expect.poll(async () => (await bridge(page)).asked).toEqual([CLOSE_QUESTION, CLOSE_QUESTION]);
@@ -190,11 +190,11 @@ test("File > Close over unsaved changes asks File > New's question: No keeps the
   await expect.poll(async () => (await bridge(page)).asked).toEqual([DISCARD_QUESTION]);
   await page.waitForTimeout(800);
   await expect(vp).toHaveAttribute("data-objects", "1");
-  await expect(page).toHaveTitle("• Untitled - Sawhorse");
+  await expect(page).toHaveTitle("• Untitled - VolumeCraft");
   await setBridge(page, { answer: "Ok" });
   await (await fileMenu(page)).getByText("Close", { exact: true }).click();
   await expect(vp).toHaveAttribute("data-objects", "0");
-  await expect(page).toHaveTitle("Untitled - Sawhorse");
+  await expect(page).toHaveTitle("Untitled - VolumeCraft");
   await expect.poll(async () => (await bridge(page)).unsaved).toBe(false);
   const b = await bridge(page);
   expect(b.asked).toEqual([DISCARD_QUESTION, DISCARD_QUESTION]);

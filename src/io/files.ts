@@ -1,3 +1,4 @@
+import { APP_NAME } from "../lib/brand";
 // Opening and saving files, the same way in every host:
 //
 // - Tauri (desktop): the dialog plugin picks a path, the fs plugin reads or writes it.
@@ -116,7 +117,7 @@ export function isTauri(): boolean {
 export async function askYesNo(message: string): Promise<boolean> {
   if (isTauri()) {
     const { confirm } = await import("@tauri-apps/plugin-dialog");
-    return confirm(message, { title: "Sawhorse", kind: "warning" });
+    return confirm(message, { title: APP_NAME, kind: "warning" });
   }
   return window.confirm(message);
 }

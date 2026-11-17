@@ -54,8 +54,8 @@ describe("platform", () => {
   it("quitLabel: the desktop File menu's last item as each platform names it (lane 35, #44)", () => {
     for (const [p, ua, label] of [
       ["Win32", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Exit"],
-      ["MacIntel", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", "Quit Sawhorse"],
-      ["", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", "Quit Sawhorse"],
+      ["MacIntel", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", "Quit VolumeCraft"],
+      ["", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", "Quit VolumeCraft"],
       ["Linux x86_64", "Mozilla/5.0 (X11; Linux x86_64)", "Quit"],
       ["", "Mozilla/5.0 (X11; Linux x86_64)", "Quit"],
     ] as const) {

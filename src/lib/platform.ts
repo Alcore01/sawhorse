@@ -1,3 +1,4 @@
+import { APP_NAME } from "./brand";
 // Which platform the app runs on, in one place: the checks that make it behave the way that
 // platform's own apps do.
 
@@ -18,7 +19,7 @@ function isLinux(): boolean {
  * name it: "Exit" on Windows, "Quit Sawhorse" on macOS, "Quit" on Linux.
  */
 export function quitLabel(): string {
-  if (isMac()) return "Quit Sawhorse";
+  if (isMac()) return `Quit ${APP_NAME}`;
   return isLinux() ? "Quit" : "Exit";
 }
 

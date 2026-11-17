@@ -226,7 +226,7 @@ test("Open with Scale active leaves no box, and what was selected scales nothing
   await scaleOnBoard(page);
   expect((await solids(page))[0].number).toBe(number);
   await page.getByTestId("file-input").setInputFiles({ name: "box.shz", mimeType: "application/vnd.sawhorse.shz", buffer: saved });
-  await expect(page).toHaveTitle("box - Sawhorse");
+  await expect(page).toHaveTitle("box - VolumeCraft");
   near((await solids(page))[0].max, [12, 12, 6]);
   // Nothing is selected in the opened model, so no box: not the board's, and not one round
   // the box, which the board's selection would name if it outlived the Open.
