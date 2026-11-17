@@ -371,3 +371,28 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Fichiers : `scripts/sketchcraft/build-apk.sh` (cherche un Java 21 à 24 : `JAVA_HOME`, `/usr/lib/jvm/*21*`, 22 à 24, le Java d'Android Studio, celui du PATH ; le donne à Gradle par `JAVA_HOME` ; sinon dit d'installer `openjdk-21-jdk`) ; `scripts/sketchcraft/LISEZMOI.md`.
 - Écarté : passer à Gradle 9 (accepte Java 25) : le greffon Android du projet (AGP 8.13) n'y est pas prévu.
 - Vérification : `bash -n` ; la recherche du Java, jouée ici, trouve `/usr/lib/jvm/java-21-openjdk-amd64` (version 21). Non vérifié : la construction complète chez JC.
+
+## H-20261117-14 · évolution · module|interface · Consolidation : cycle complet testé ; union de solides ; volume des faces simples ; faces connexes (E-04, E-36, E-37)
+
+- Origine : JC (17 nov. 2026, 16 h 41) : « pour le moment pas encore de hvac on va faire 1 et 2 » (1 : consolider ; 2 : volume des faces fermées, faces connexes, union de solides) ; E-04, E-36, E-37.
+- Fichiers : `crates/kernel/src/model.rs` (op `UnionSolids` ; `closed_faces_volume`, `connected_faces`, `region_world_rings` en lecture seule) ; `crates/kernel/tests/volumetrie_cycle.rs` (nouveau) ; `crates/wasm-api/src/lib.rs` (`faces_query_json`, `faces_query`) ; `src/kernel/types.ts`, `kernel.worker.ts`, `client.ts` (requête `facesQuery`) ; `src/lib/measure.ts` (« enclosing … m³ ») ; `src/tools/tool.ts`, `src/tools/select.ts` (double-clic sur une face simple) ; `src/App.tsx` (volume demandé au noyau quand 4 faces simples ou plus sont choisies ; Édition > Join Solids ; hôte `connectedFaces`) ; tests `select.test.ts`, `measure.test.ts`.
+- Évolution : le cycle de la volumétrie (boîte, éclatement, dessus retiré, toit à deux pans, dalle de toiture, maison refaite, union) est éprouvé avec annuler puis rétablir et enregistrer puis rouvrir à chaque étape ; des solides qui se touchent ou se recouvrent deviennent un seul (Édition > Join Solids) ; des faces simples qui ferment une coque disent leur volume ; un double-clic sur une face simple prend toute la coque.
+- Écarté : calculer le volume des faces dans l'interface (orientation des faces à refaire en double du noyau).
+- Effet sur les résultats, les projets : aucun sur l'existant ; une op nouvelle dans le journal.
+- Confidentialité : non.
+- Vérification : noyau, 2 scénarios (le cycle entier : 13 étapes, chacune annulée, rétablie, enregistrée et rouverte à l'identique ; union refusée de solides éloignés, modèle inchangé) ; interface, 2 tests (double-clic → faces connexes ; texte du volume). Niveau : testé (banc : 4 scénarios). Non vérifié : à la souris ; le WASM est à reconstruire chez JC (`npm run wasm`), sans quoi le volume des faces ne s'affiche pas (l'interface se tait alors).
+- Limites connues : voir E-38.
+
+## H-20261117-15 · correction · module|interface · Constats de la relecture à froid (agent neutre)
+
+- Origine : relecture à froid demandée dans le point 1 retenu par JC (17 nov. 2026, 16 h 41) ; 13 constats (aucun grave), 7 traités ici, 6 notés en E-38.
+- Corrections et leurs tests :
+  - constat 2 : `ExtrudeFaces` refusait des faces disjointes alors que l'op les annonçait : un solide par groupe de faces qui se touchent (`face_groups`) ; test `faces_apart_extrude_together_into_one_solid_each` (échouait avant).
+  - constat 3 : la touche Maj à l'écran n'atteignait pas les clics du stylet (Maj+clic n'ajoutait rien) : `virtualShift()` ajouté aux événements de la vue ; Maj relâchée quand la barre disparaît ; test KeyBar (échouait avant).
+  - constat 4 : seuil de volume pris sur une tolérance de longueur (en dessous d'environ 1 cm³, « pas de volume ») : seuil PLANARITY³ ; test `small_volumes_are_volumes` (échouait avant).
+  - constat 5 : soudure des sommets en temps quadratique : grille de cellules ; coupure aux coins limitée à la plage en x de chaque côté. Comportement identique (tests existants).
+  - constat 7 : mesure de la sélection recalculée à chaque rendu : `useMemo`.
+  - constat 9 : service worker : cache jamais renouvelé ni purgé, page d'erreur gardée hors ligne, requêtes du service de rendu servies du cache : `sw.js` est maintenant écrit par la construction (`src/lib/swSource.ts`, greffon Vite) avec la liste exacte des fichiers et une version tirée de cette liste ; l'ancien cache est effacé ; seuls ces fichiers sont gardés ; la page n'est gardée que si elle est revenue entière. `public/sw.js` retiré (remplacé par le fichier construit) ; 2 tests.
+  - constat 11 : union de solides qui ne se touchent que par une arête : message clair au lieu de l'erreur brute du moteur booléen ; test (échouait avant).
+- Fichiers : `crates/kernel/src/model.rs`, `crates/kernel/tests/volumetrie_cycle.rs`, `src/components/KeyBar.tsx` et son test, `src/components/Viewport.tsx`, `src/App.tsx`, `src/lib/swSource.ts` et son test, `vite.config.ts`, `public/sw.js` (retiré).
+- Vérification : `cargo test --workspace` 758 réussis, clippy et fmt propres ; vitest 1186 réussis ; `tsc -b` et build propres (`dist/sw.js` écrit avec 87 fichiers). Niveau : testé (banc : 6 scénarios ajoutés). Non vérifié : les e2e Playwright (à lancer chez JC), le service worker sur une vraie tablette.

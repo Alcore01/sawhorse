@@ -4475,16 +4475,39 @@ impl Model {
                 .map(|r| r.iter().map(|&p| p + v).collect())
                 .collect()
         }));
-        for u in uses.values().filter(|u| u.len() == 1) {
-            let (pa, pb) = (points[u[0].0], points[u[0].1]);
-            rings.push(vec![vec![pa, pb, pb + v, pa + v]]);
+        // Review (constat 2): faces apart make one solid each (the pieces: faces joined
+        // across shared edges, with their tops and sides).
+        let groups = face_groups(&polys);
+        let n = bottom.len();
+        let mut objs = Vec::new();
+        for g in &groups {
+            let mut piece: Vec<Vec<Vec<DVec3>>> = Vec::new();
+            for &fi in g {
+                piece.push(rings[fi].clone());
+                piece.push(rings[n + fi].clone());
+            }
+            for u in uses.values().filter(|u| u.len() == 1) {
+                let (a, b) = u[0];
+                if g.iter()
+                    .any(|&fi| polys[fi].iter().any(|r| r.contains(&a) && r.contains(&b)))
+                {
+                    let (pa, pb) = (points[a], points[b]);
+                    piece.push(vec![vec![pa, pb, pb + v, pa + v]]);
+                }
+            }
+            let mut obj = solid_from_rings(&piece)?;
+            obj.member.parent = self.context;
+            objs.push(obj);
         }
-        let mut obj = solid_from_rings(&rings)?;
-        obj.member.parent = self.context;
-        let id = self.insert_object(obj);
+        let ids: Vec<u64> = objs
+            .into_iter()
+            .map(|o| to_public(self.insert_object(o)))
+            .collect();
         self.mark(self.context);
-        Ok(OpOutcome::ObjectCreated {
-            object: to_public(id),
+        Ok(if ids.len() == 1 {
+            OpOutcome::ObjectCreated { object: ids[0] }
+        } else {
+            OpOutcome::Severed { objects: ids }
         })
     }
 
@@ -4507,8 +4530,15 @@ impl Model {
         let first = keys[0];
         let mut acc = self.objects[first].clone();
         for &k in &keys[1..] {
+            // Review (constat 11): solids meeting only along an edge or at a corner make no
+            // valid solid: say so plainly.
             acc = acc
-                .combine(&self.objects[k], crate::boolean::BoolOp::Union)?
+                .combine(&self.objects[k], crate::boolean::BoolOp::Union)
+                .map_err(|_| {
+                    not_a_volume(
+                        "these solids cannot be joined: they meet only along an edge or at a corner (or the result is not a valid solid)",
+                    )
+                })?
                 .ok_or_else(|| not_a_volume("the union is empty"))?;
         }
         self.objects[first] = acc;
@@ -4574,35 +4604,13 @@ impl Model {
             return Vec::new();
         };
         let (_, polys) = weld_rings(&rings);
-        let mut by_edge: BTreeMap<(usize, usize), Vec<usize>> = BTreeMap::new();
-        for (fi, f) in polys.iter().enumerate() {
-            for r in f {
-                for i in 0..r.len() {
-                    let (a, b) = (r[i], r[(i + 1) % r.len()]);
-                    by_edge.entry((a.min(b), a.max(b))).or_default().push(fi);
-                }
-            }
-        }
-        let mut seen = vec![false; keys.len()];
-        seen[start] = true;
-        let mut stack = vec![start];
-        while let Some(fi) = stack.pop() {
-            for f in &polys[fi] {
-                for i in 0..f.len() {
-                    let (a, b) = (f[i], f[(i + 1) % f.len()]);
-                    for &o in &by_edge[&(a.min(b), a.max(b))] {
-                        if !seen[o] {
-                            seen[o] = true;
-                            stack.push(o);
-                        }
-                    }
-                }
-            }
-        }
-        keys.into_iter()
-            .zip(seen)
-            .filter_map(|(k, s)| s.then_some(k))
-            .collect()
+        let group = face_groups(&polys)
+            .into_iter()
+            .find(|g| g.contains(&start))
+            .unwrap_or_default();
+        let mut out: Vec<[u64; 2]> = group.into_iter().map(|i| keys[i]).collect();
+        out.sort();
+        out
     }
 
     /// The world rings (outer first) of a live region, read only.
@@ -4975,6 +4983,46 @@ fn straight(pts: &[DVec3]) -> bool {
 /// sketchcraft E-19: into `s` (on `plane`), the `foreign` edges connected to the stroke
 /// `pts` (through shared ends, edge after edge), kept only when they close a loop: the
 /// regions their insertion bounds; `s` is left as it was when there are none.
+/// sketchcraft E-30 / E-37: the faces (indices into `polys`) joined across shared sides,
+/// group by group, each in ascending order.
+fn face_groups(polys: &[Vec<Vec<usize>>]) -> Vec<Vec<usize>> {
+    let mut by_edge: BTreeMap<(usize, usize), Vec<usize>> = BTreeMap::new();
+    for (fi, f) in polys.iter().enumerate() {
+        for r in f {
+            for i in 0..r.len() {
+                let (a, b) = (r[i], r[(i + 1) % r.len()]);
+                by_edge.entry((a.min(b), a.max(b))).or_default().push(fi);
+            }
+        }
+    }
+    let mut seen = vec![false; polys.len()];
+    let mut groups = Vec::new();
+    for s in 0..polys.len() {
+        if seen[s] {
+            continue;
+        }
+        seen[s] = true;
+        let (mut stack, mut g) = (vec![s], Vec::new());
+        while let Some(fi) = stack.pop() {
+            g.push(fi);
+            for r in &polys[fi] {
+                for i in 0..r.len() {
+                    let (a, b) = (r[i], r[(i + 1) % r.len()]);
+                    for &o in &by_edge[&(a.min(b), a.max(b))] {
+                        if !seen[o] {
+                            seen[o] = true;
+                            stack.push(o);
+                        }
+                    }
+                }
+            }
+        }
+        g.sort();
+        groups.push(g);
+    }
+    groups
+}
+
 fn not_a_volume(m: &str) -> KernelError {
     DocumentError::NotAVolume(m.into()).into()
 }
@@ -4983,6 +5031,18 @@ fn not_a_volume(m: &str) -> KernelError {
 /// lying on it (T-junctions): the points and, per face, its rings as indices.
 #[allow(clippy::type_complexity)]
 fn weld_rings(rings_of: &[Vec<Vec<DVec3>>]) -> (Vec<DVec3>, Vec<Vec<Vec<usize>>>) {
+    // Review of 17 nov. 2026 (constat 5): corners found through a grid of cells twice the
+    // weld distance (the 27 cells around), not by a search through every point.
+    let cell = 2.0 * PLANARITY;
+    let key = |p: DVec3| {
+        (
+            (p.x / cell).floor() as i64,
+            (p.y / cell).floor() as i64,
+            (p.z / cell).floor() as i64,
+        )
+    };
+    let mut grid: std::collections::HashMap<(i64, i64, i64), Vec<usize>> =
+        std::collections::HashMap::new();
     let mut points: Vec<DVec3> = Vec::new();
     let mut idx: Vec<Vec<Vec<usize>>> = Vec::new();
     for f in rings_of {
@@ -4990,10 +5050,26 @@ fn weld_rings(rings_of: &[Vec<Vec<DVec3>>]) -> (Vec<DVec3>, Vec<Vec<Vec<usize>>>
         for r in f {
             let mut ri = Vec::new();
             for &p in r {
-                let i = match points.iter().position(|q| q.distance(p) <= PLANARITY) {
+                let (kx, ky, kz) = key(p);
+                let mut found = None;
+                'near: for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        for dz in -1..=1 {
+                            if let Some(v) = grid.get(&(kx + dx, ky + dy, kz + dz))
+                                && let Some(&i) =
+                                    v.iter().find(|&&i| points[i].distance(p) <= PLANARITY)
+                            {
+                                found = Some(i);
+                                break 'near;
+                            }
+                        }
+                    }
+                }
+                let i = match found {
                     Some(i) => i,
                     None => {
                         points.push(p);
+                        grid.entry((kx, ky, kz)).or_default().push(points.len() - 1);
                         points.len() - 1
                     }
                 };
@@ -5005,13 +5081,24 @@ fn weld_rings(rings_of: &[Vec<Vec<DVec3>>]) -> (Vec<DVec3>, Vec<Vec<Vec<usize>>>
         }
         idx.push(fr);
     }
+    // The corners lying on a side: only those within its x range are looked at.
+    let mut by_x: Vec<usize> = (0..points.len()).collect();
+    by_x.sort_by(|&i, &j| points[i].x.total_cmp(&points[j].x));
     let split = |ring: &Vec<usize>| -> Vec<usize> {
         let mut out = Vec::new();
         for i in 0..ring.len() {
             let (a, b) = (ring[i], ring[(i + 1) % ring.len()]);
             out.push(a);
             let (pa, d) = (points[a], points[b] - points[a]);
-            let mut on: Vec<(f64, usize)> = (0..points.len())
+            let (lo, hi) = (
+                pa.x.min(points[b].x) - PLANARITY,
+                pa.x.max(points[b].x) + PLANARITY,
+            );
+            let from = by_x.partition_point(|&j| points[j].x < lo);
+            let to = by_x.partition_point(|&j| points[j].x <= hi);
+            let mut on: Vec<(f64, usize)> = by_x[from..to]
+                .iter()
+                .copied()
                 .filter(|&j| j != a && j != b)
                 .filter_map(|j| {
                     let t = (points[j] - pa).dot(d) / d.length_squared();
@@ -5103,7 +5190,8 @@ fn solid_from_rings(rings_of: &[Vec<Vec<DVec3>>]) -> Result<Object, KernelError>
         })
         .sum::<f64>()
         / 6.0;
-    if volume.abs() <= PLANARITY {
+    // Review (constat 4): a volume, not a length, decides: PLANARITY³ (1e-18 m³).
+    if volume.abs() <= PLANARITY * PLANARITY * PLANARITY {
         return Err(refuse("these faces enclose no volume"));
     }
     if volume < 0.0 {

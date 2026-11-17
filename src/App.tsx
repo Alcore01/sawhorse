@@ -517,6 +517,9 @@ export function App() {
       stale = true;
     };
   }, [selection, sceneHash]);
+  // Review of 17 nov. 2026 (constat 7): the selection's areas and volumes, worked out when the
+  // selection or the model changes, not on every render (a hover re-renders the app).
+  const selectionMeasure = useMemo(() => measureSelection(selection, scene?.state, scene?.mesh), [selection, scene]);
   const engineRef = useRef<ViewportEngine | null>(null);
   // Latest state for the tool host (tools live outside React).
   const live = useRef({ scene, units, selection, target, vcbEditing: false, vcbFor: null as ToolId | null, lastError: null as string | null });
@@ -2805,7 +2808,7 @@ export function App() {
     if (st.meshes?.length) hud.push({ text: `${plural(st.meshes.length, "mesh")} not solid (imported)`, tone: "err" });
     if (selection.length) {
       // sketchcraft E-10: what the selection measures (faces' area, solids' volume).
-      const measured = describeMeasure(measureSelection(selection, st, scene?.mesh), units, closedVolume);
+      const measured = describeMeasure(selectionMeasure, units, closedVolume);
       hud.push({ text: `Selection: ${selection.length}${measured ? ` · ${measured}` : ""}` });
     }
     else if (target && toolId === "pushpull") hud.push({ text: `Selected: ${describeTarget(target)}` });

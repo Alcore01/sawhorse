@@ -1,12 +1,13 @@
 // sketchcraft E-34: the on-screen keys send the app what a keyboard would.
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { KeyBar } from "./KeyBar";
+import { KeyBar, virtualShift } from "./KeyBar";
 
 describe("KeyBar (E-34)", () => {
   const seen: string[] = [];
   const on = (e: KeyboardEvent) => seen.push(`${e.type}:${e.key}${e.ctrlKey ? "+ctrl" : ""}`);
   afterEach(() => {
+    cleanup();
     window.removeEventListener("keydown", on);
     window.removeEventListener("keyup", on);
     seen.length = 0;
@@ -23,5 +24,15 @@ describe("KeyBar (E-34)", () => {
     expect(seen).toEqual(["keydown:Escape", "keydown:Enter", "keydown:ArrowRight", "keydown:ArrowLeft", "keydown:ArrowUp", "keydown:ArrowDown", "keydown:Shift", "keyup:Shift", "keydown:z+ctrl"]);
     fireEvent.pointerDown(screen.getByRole("button", { name: /Hide/ }));
     expect(close).toHaveBeenCalled();
+  });
+
+  it("holds Shift for the pointer events too, and lets it go when the bar goes (review, constat 3)", () => {
+    window.addEventListener("keyup", on);
+    const { unmount } = render(<KeyBar onClose={() => {}} />);
+    fireEvent.pointerDown(screen.getByRole("button", { name: /^Shift$/ }));
+    expect(virtualShift()).toBe(true);
+    unmount();
+    expect(virtualShift()).toBe(false);
+    expect(seen).toContain("keyup:Shift");
   });
 });

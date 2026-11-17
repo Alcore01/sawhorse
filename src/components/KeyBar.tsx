@@ -3,7 +3,15 @@
 // down until tapped again) and Undo. Each button sends the app the key a keyboard would, so
 // the tools behave exactly as with a keyboard. Shown by View > On-screen Keys, and turned on
 // by itself the first time a pen or a finger touches the app.
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+/** The on-screen Shift is held (review of 17 nov. 2026, constat 3): a pen tap carries no
+ * shiftKey of its own, so the viewport adds this to the pointer events it hands the tools
+ * (Shift+click adds to the selection, as with a keyboard). */
+let shiftHeld = false;
+export function virtualShift(): boolean {
+  return shiftHeld;
+}
 
 export function sendKey(key: string, type: "keydown" | "keyup" = "keydown", extra: KeyboardEventInit = {}): void {
   window.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, cancelable: true, ...extra }));
@@ -20,6 +28,16 @@ const KEYS: { label: string; key: string; title: string; className?: string }[] 
 
 export function KeyBar({ onClose }: { onClose: () => void }) {
   const [shift, setShift] = useState(false);
+  // The bar closed (or Sheets opened) while Shift is held: let it go, as a key would be.
+  useEffect(
+    () => () => {
+      if (shiftHeld) {
+        shiftHeld = false;
+        sendKey("Shift", "keyup");
+      }
+    },
+    [],
+  );
   // Buttons never take the focus (the pen stays on the model) and act on the press.
   const press = (fn: () => void) => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -40,6 +58,7 @@ export function KeyBar({ onClose }: { onClose: () => void }) {
         aria-label="Shift"
         onPointerDown={press(() => {
           sendKey("Shift", shift ? "keyup" : "keydown", { shiftKey: !shift });
+          shiftHeld = !shift;
           setShift(!shift);
         })}
       >

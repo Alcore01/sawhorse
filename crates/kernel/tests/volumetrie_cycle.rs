@@ -251,3 +251,82 @@ fn solids_apart_are_not_joined_and_nothing_changes() {
     );
     assert_eq!(d.model().hash(), h);
 }
+
+// ---- review of 17 nov. 2026 (relecture à froid) -------------------------------------------
+
+fn ground_rects(rects: &[(f64, f64, f64, f64)]) -> Document {
+    let mut d = Document::with_ground_sketch();
+    for &(x, y, w, h) in rects {
+        ok(
+            &mut d,
+            Op::AddRectangle {
+                sketch: 1,
+                x,
+                y,
+                w,
+                h,
+            },
+        );
+    }
+    d
+}
+
+#[test]
+fn faces_apart_extrude_together_into_one_solid_each() {
+    // Constat 2: the op said "touching or not", and refused faces apart.
+    let mut d = ground_rects(&[(0.0, 0.0, 1.0, 1.0), (3.0, 0.0, 1.0, 1.0)]);
+    let f: Vec<[u64; 2]> = faces(d.model()).into_iter().map(|f| f.0).collect();
+    assert_eq!(f.len(), 2);
+    ok(
+        &mut d,
+        Op::ExtrudeFaces {
+            faces: f,
+            vector: [0.0, 0.0, 1.0],
+        },
+    );
+    assert_eq!(d.model().objects().len(), 2);
+    assert!(d.model().stats().watertight);
+    assert!((d.model().stats().volume_m3 - 2.0).abs() < 1e-9);
+}
+
+#[test]
+fn small_volumes_are_volumes() {
+    // Constat 4: a length tolerance was used as a volume: under about 1 cm³ was "no volume".
+    let mut d = ground_rects(&[(0.0, 0.0, 0.009, 0.009)]);
+    let f: Vec<[u64; 2]> = faces(d.model()).into_iter().map(|f| f.0).collect();
+    ok(
+        &mut d,
+        Op::ExtrudeFaces {
+            faces: f,
+            vector: [0.0, 0.0, 0.005],
+        },
+    );
+    assert!((d.model().stats().volume_m3 - 0.009 * 0.009 * 0.005).abs() < 1e-15);
+    let object = d.model().objects()[0].0;
+    ok(&mut d, Op::ExplodeSolid { object });
+    let all: Vec<[u64; 2]> = faces(d.model()).into_iter().map(|f| f.0).collect();
+    assert!((d.model().closed_faces_volume(&all).unwrap() - 0.009 * 0.009 * 0.005).abs() < 1e-15);
+    ok(&mut d, Op::SolidFromFaces { faces: all });
+    assert_eq!(d.model().objects().len(), 1);
+}
+
+#[test]
+fn solids_touching_on_an_edge_only_are_refused_in_plain_words() {
+    // Constat 11: the raw boolean error came through.
+    let mut d = ground_rects(&[(0.0, 0.0, 1.0, 1.0), (1.0, 1.0, 1.0, 1.0)]);
+    for f in faces(d.model()) {
+        ok(
+            &mut d,
+            Op::Extrude {
+                sketch: f.0[0],
+                region: f.0[1],
+                distance: 1.0,
+            },
+        );
+    }
+    let ids: Vec<u64> = d.model().objects().iter().map(|o| o.0).collect();
+    assert_eq!(ids.len(), 2);
+    let err = d.apply_owned(Op::UnionSolids { objects: ids }).unwrap_err();
+    let msg = err.to_string();
+    assert!(msg.contains("cannot be joined"), "{msg}");
+}

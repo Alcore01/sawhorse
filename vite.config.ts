@@ -2,6 +2,9 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { serviceWorkerSource } from "./src/lib/swSource";
 
 // This checkout's own root (forward slashes), so watch exclusions below match only what is
 // inside it: a dev server started inside a lane worktree (<repo>/.worktrees/<lane>) must
@@ -62,6 +65,36 @@ function cspMeta(): Plugin {
   };
 }
 
+/** sketchcraft E-34: sw.js, written with the build's own file list (src/lib/swSource.ts).
+ * Not for the desktop app (Tauri), which never registers it. */
+function serviceWorker(): Plugin {
+  const publicFiles = (dir: string): string[] => {
+    const out: string[] = [];
+    const walk = (d: string) => {
+      for (const n of readdirSync(d)) {
+        const p = join(d, n);
+        if (statSync(p).isDirectory()) walk(p);
+        else out.push(relative(dir, p).replace(/\\/g, "/"));
+      }
+    };
+    try {
+      walk(dir);
+    } catch {
+      /* no public folder */
+    }
+    return out;
+  };
+  return {
+    name: "volumecraft-sw",
+    apply: "build",
+    generateBundle(_options, bundle) {
+      if (process.env.TAURI_ENV_PLATFORM) return;
+      const files = [...Object.keys(bundle), ...publicFiles(join(root, "public"))].filter((f) => f !== "sw.js");
+      this.emitFile({ type: "asset", fileName: "sw.js", source: serviceWorkerSource(files) });
+    },
+  };
+}
+
 /**
  * Lane 17: the page-context test hooks that load and enable plugins without the permission
  * dialog (window.__sawhorse.plugins, src/plugins/usePlugins.tsx) are compiled only into the
@@ -75,7 +108,7 @@ export function testHooks(command: string, mode: string): boolean {
 
 export default defineConfig(({ command, mode }) => ({
   define: { __SAWHORSE_TEST_HOOKS__: JSON.stringify(testHooks(command, mode)) },
-  plugins: [react(), cspMeta()],
+  plugins: [react(), cspMeta(), serviceWorker()],
   clearScreen: false,
   // Relative by default (the Tauri webview and any static folder). The public demo is built
   // with VITE_BASE=/app/ (.github/workflows/pages.yml, scripts/build-site.mjs) so it is

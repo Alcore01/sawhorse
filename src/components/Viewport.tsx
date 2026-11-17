@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { MeshData, MeshPart } from "../kernel/types";
+import { virtualShift } from "./KeyBar";
 import type { Vec3 } from "../lib/edit";
 import { INFERENCE_STYLES, LEGEND_KINDS, SNAP_SWITCHES, type InferenceKind } from "../lib/inferenceStyle";
 import { isMacControlClick } from "../lib/platform";
@@ -233,7 +234,7 @@ export function Viewport(props: ViewportProps) {
   };
   const send = (type: ViewportPointer["type"], e: React.PointerEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
     const [x, y] = local(e);
-    cb.current.onPointer?.({ type, x, y, button: e.button, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey, macControl: isMacControlClick(e) });
+    cb.current.onPointer?.({ type, x, y, button: e.button, shift: e.shiftKey || virtualShift(), ctrl: e.ctrlKey || e.metaKey, alt: e.altKey, macControl: isMacControlClick(e) });
   };
 
   const tri = mesh ? mesh.indices.length / 3 : 0;
