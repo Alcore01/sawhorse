@@ -296,6 +296,16 @@ export class KernelClient {
     return (await this.call({ kind: "outline", part, owner, index })).rings ?? [];
   }
 
+  /** sketchcraft E-36: the volume (m³) loose faces close, or null when they close none. */
+  async closedFacesVolume(faces: [number, number][]): Promise<number | null> {
+    return (await this.call({ kind: "facesQuery", query: "closed_volume", args: { faces } })).answer?.volume ?? null;
+  }
+
+  /** sketchcraft E-37: the loose faces reached from one across shared edges (itself too). */
+  async connectedFaces(sketch: number, region: number): Promise<[number, number][]> {
+    return (await this.call({ kind: "facesQuery", query: "connected", args: { sketch, region } })).answer?.faces ?? [];
+  }
+
   /** What an offset would draw (read-only). Throws KernelRefusal when it would be refused. */
   async offsetPreview(source: OffsetSource, distance: number): Promise<OffsetPreview> {
     const r = await this.call({ kind: "offsetPreview", source, distance });

@@ -68,4 +68,10 @@ describe("Selection measures (sketchcraft E-10)", () => {
     expect(formatSurface(0.09290304, "ft-in")).toBe("1.00 sq ft");
     expect(formatSurface(12.345, "m")).toBe("12.35 m²");
   });
+
+  it("tells the volume loose faces enclose (sketchcraft E-36)", () => {
+    const m = { faces: 9, area: 12.5, solids: 0, volume: 0 };
+    expect(describeMeasure(m, "m", 2.5)).toBe("9 faces · 12.50 m² · enclosing 2.5 m³");
+    expect(describeMeasure(m, "m", null)).toBe("9 faces · 12.50 m²");
+  });
 });

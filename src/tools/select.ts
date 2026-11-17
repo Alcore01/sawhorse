@@ -119,6 +119,18 @@ export class SelectTool extends Tool {
           h.enterGroup(ent.node);
           return;
         }
+        // sketchcraft E-37: a loose face double-clicked: every face it touches across an edge,
+        // and those they touch (the whole shell, SketchUp's "select all connected").
+        if (ent.kind === "region" && h.connectedFaces) {
+          const mode = modeFor(e);
+          void h.connectedFaces(ent.sketch, ent.region).then((pairs) => {
+            if (!pairs.length) return;
+            const faces: Entity[] = pairs.map(([sketch, region]) => ({ kind: "region", sketch, region }));
+            h.setSelection(applySelection(h.selection(), faces, mode));
+            h.status(`Selected ${faces.length} connected face${faces.length === 1 ? "" : "s"}.`);
+          });
+          return;
+        }
         const object = objectOf(ent);
         if (object === null) return;
         h.setSelection(applySelection(h.selection(), [{ kind: "object", object }], modeFor(e)));

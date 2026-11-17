@@ -610,6 +610,30 @@ impl DocCore {
         serde_json::to_string(&faces).map_err(|e| e.to_string())
     }
 
+    /// sketchcraft E-36 / E-37: read-only questions about loose faces, as JSON.
+    /// `"closed_volume"` `{"faces":[[sketch,region],...]}` → `{"volume": m³ or null}`;
+    /// `"connected"` `{"sketch":s,"region":r}` → `{"faces":[[sketch,region],...]}`.
+    pub fn faces_query_json(&self, kind: &str, query_json: &str) -> Result<String, String> {
+        let q: serde_json::Value = serde_json::from_str(query_json).map_err(|e| e.to_string())?;
+        let m = self.doc.model();
+        let out = match kind {
+            "closed_volume" => {
+                let faces: Vec<[u64; 2]> =
+                    serde_json::from_value(q["faces"].clone()).map_err(|e| e.to_string())?;
+                serde_json::json!({ "volume": m.closed_faces_volume(&faces) })
+            }
+            "connected" => {
+                let (s, r) = (q["sketch"].as_u64(), q["region"].as_u64());
+                let (Some(s), Some(r)) = (s, r) else {
+                    return Err("connected: give sketch and region".into());
+                };
+                serde_json::json!({ "faces": m.connected_faces(s, r) })
+            }
+            k => return Err(format!("unknown faces query {k}")),
+        };
+        Ok(out.to_string())
+    }
+
     /// The outline of a face (`kind` "face": object id, persistent face id) or a sketch
     /// region (`kind` "region": sketch id, region id) as world rings (outer first), JSON.
     pub fn outline_json(&self, kind: &str, owner: u64, index: u64) -> Result<String, String> {
@@ -1105,6 +1129,11 @@ impl Doc {
         self.core
             .outline_json(kind, id(owner)?, id(index)?)
             .map_err(js)
+    }
+
+    /// sketchcraft E-36 / E-37: see [`DocCore::faces_query_json`].
+    pub fn faces_query(&self, kind: &str, query_json: &str) -> Result<String, JsError> {
+        self.core.faces_query_json(kind, query_json).map_err(js)
     }
 
     /// The faces of one object with their persistent ids, planes, centroids and areas, as

@@ -128,6 +128,9 @@ export interface ToolHost {
    * selection through undo and redo as before.
    */
   rememberSelection?(before: Entity[]): void;
+  /** sketchcraft E-37: the loose faces reached from a sketch region across shared edges
+   * (itself included), as [sketch, region] pairs. Optional: without it, no such selection. */
+  connectedFaces?(sketch: number, region: number): Promise<[number, number][]>;
   /** World rings of a face or region, or (lane 23) a curve's points as one ring (empty when
    * it is gone). */
   outline(t: OutlineTarget): Promise<V3[][]>;

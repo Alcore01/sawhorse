@@ -59,6 +59,8 @@ export type KernelOp =
   | { op: "explode_solid"; object: number }
   | { op: "solid_from_faces"; faces: [number, number][] }
   | { op: "extrude_faces"; faces: [number, number][]; vector: [number, number, number] }
+  // sketchcraft E-04: solids that touch or overlap become one.
+  | { op: "union_solids"; objects: number[] }
   | { op: "delete_node"; node: number }
   | { op: "rename"; item: Item; name: string | null }
   | { op: "rename_definition"; definition: number; name: string }
@@ -841,6 +843,8 @@ export interface WasmDoc {
   infer(query: string): string;
   faces_json(object: number): string;
   outline(kind: string, owner: number, index: number): string;
+  /** sketchcraft E-36 / E-37: read-only questions about loose faces (JSON in, JSON out). */
+  faces_query(kind: string, query: string): string;
   offset_preview(query: string): string;
   export_stl(object: number): Uint8Array;
   export_obj(object: number): string;
@@ -914,6 +918,7 @@ export type RequestBody =
   | { kind: "pick"; query: PickQuery }
   | { kind: "infer"; query: InferQuery }
   | { kind: "outline"; part: "face" | "region" | "curve" | "rim"; owner: number; index: number }
+  | { kind: "facesQuery"; query: "closed_volume" | "connected"; args: unknown }
   | { kind: "offsetPreview"; source: OffsetSource; distance: number }
   | { kind: "export"; format: "stl" | "obj"; object: number }
   | { kind: "exportFile"; format: ExportFormat; options: ExportOptions }
@@ -987,6 +992,8 @@ export type WorkerResponse =
       picked?: Picked | null;
       inference?: Inference | null;
       rings?: V3[][];
+      /** sketchcraft E-36 / E-37: a faces query's answer. */
+      answer?: { volume?: number | null; faces?: [number, number][] };
       preview?: OffsetPreview;
       file?: Uint8Array | string;
       /** Reader notes from an import (units assumed, entities skipped). */

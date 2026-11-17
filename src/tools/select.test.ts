@@ -34,6 +34,27 @@ describe("Select tool", () => {
     expect(h.sel).toEqual([{ kind: "object", object: 1 }]);
   });
 
+  it("double-click on a loose face selects every connected face (sketchcraft E-37)", async () => {
+    const asked: [number, number][] = [];
+    const h = fakeHost({
+      _state: { groups: [] } as never,
+      connectedFaces: async (sketch: number, region: number) => {
+        asked.push([sketch, region]);
+        return [[2, 1], [3, 4], [5, 2]];
+      },
+    });
+    const t = new SelectTool(h);
+    const wall: Entity = { kind: "region", sketch: 3, region: 4 };
+    t.onEvent(ev("dblclick", [0.5, 0.5, 1], { picked: pickOf(wall) }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(asked).toEqual([[3, 4]]);
+    expect(h.sel).toEqual([
+      { kind: "region", sketch: 2, region: 1 },
+      { kind: "region", sketch: 3, region: 4 },
+      { kind: "region", sketch: 5, region: 2 },
+    ]);
+  });
+
   it("a click on a grouped solid selects the group; a double-click opens it", () => {
     let entered: number | null = null;
     const I = { linear: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], translation: [0, 0, 0] };

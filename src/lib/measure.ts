@@ -75,9 +75,11 @@ export function formatSurface(m2: number, system: UnitSystem): string {
 }
 
 /** The selection's measures for the viewport's badge: "3 faces · 52.30 m²", "1 solid · 466.18 m³". */
-export function describeMeasure(m: SelectionMeasure, system: UnitSystem): string {
+export function describeMeasure(m: SelectionMeasure, system: UnitSystem, closed: number | null = null): string {
   const parts: string[] = [];
   if (m.faces) parts.push(`${m.faces} face${m.faces === 1 ? "" : "s"} · ${formatSurface(m.area, system)}`);
+  // sketchcraft E-36: loose faces that close a volume tell it.
+  if (closed !== null) parts.push(`enclosing ${formatVolume(closed, system)}`);
   if (m.solids) parts.push(`${m.solids} solid${m.solids === 1 ? "" : "s"} · ${formatVolume(m.volume, system)}`);
   return parts.join(" · ");
 }

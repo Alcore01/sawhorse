@@ -333,6 +333,11 @@ pub enum Op {
         faces: Vec<[u64; 2]>,
         vector: [f64; 3],
     },
+    /// sketchcraft E-04: solids that touch or overlap become one (the first keeps its
+    /// name, tag and paint; the others go).
+    UnionSolids {
+        objects: Vec<u64>,
+    },
     /// Delete a group or instance and everything in it.
     DeleteNode {
         node: u64,
@@ -2459,6 +2464,7 @@ impl Model {
             Op::ExplodeSolid { object } => self.explode_solid(*object),
             Op::SolidFromFaces { faces } => self.solid_from_faces(faces),
             Op::ExtrudeFaces { faces, vector } => self.extrude_faces(faces, *vector),
+            Op::UnionSolids { objects } => self.union_solids(objects),
             Op::DeleteNode { node } => self.delete_node(*node),
             Op::Rename { item, name } => self.rename(*item, name.as_deref()),
             Op::RenameDefinition { definition, name } => self.rename_definition(*definition, name),
@@ -4480,6 +4486,140 @@ impl Model {
         Ok(OpOutcome::ObjectCreated {
             object: to_public(id),
         })
+    }
+
+    /// sketchcraft E-04 (H-20261117-14): see [`Op::UnionSolids`].
+    fn union_solids(&mut self, objects: &[u64]) -> Result<OpOutcome, KernelError> {
+        let mut keys: Vec<ObjectId> = Vec::new();
+        for &o in objects {
+            let k = from_public::<ObjectId>(o);
+            if !self.objects.contains_key(k) {
+                return Err(DocumentError::NoSuchObject(o).into());
+            }
+            self.editable_object(k)?;
+            if !keys.contains(&k) {
+                keys.push(k);
+            }
+        }
+        if keys.len() < 2 {
+            return Err(not_a_volume("select at least two solids to join"));
+        }
+        let first = keys[0];
+        let mut acc = self.objects[first].clone();
+        for &k in &keys[1..] {
+            acc = acc
+                .combine(&self.objects[k], crate::boolean::BoolOp::Union)?
+                .ok_or_else(|| not_a_volume("the union is empty"))?;
+        }
+        self.objects[first] = acc;
+        for &k in &keys[1..] {
+            let removed = self.objects.remove(k).expect("checked");
+            self.object_order.retain(|&o| o != k);
+            self.mark(removed.member.parent);
+        }
+        self.touch(first);
+        let pieces = self.sever(first);
+        if pieces.len() > 1 {
+            return Err(not_a_volume(
+                "these solids neither touch nor overlap: they stay apart",
+            ));
+        }
+        Ok(OpOutcome::ObjectCreated {
+            object: to_public(first),
+        })
+    }
+
+    /// sketchcraft E-36 (H-20261117-14): the volume (m³) the faces `[sketch, region]`
+    /// enclose when they close one, without making a solid; `None` otherwise.
+    pub fn closed_faces_volume(&self, faces: &[[u64; 2]]) -> Option<f64> {
+        if faces.len() < 4 {
+            return None;
+        }
+        let mut rings: Vec<Vec<Vec<DVec3>>> = Vec::new();
+        let mut seen: Vec<[u64; 2]> = Vec::new();
+        for &f in faces {
+            if seen.contains(&f) {
+                continue;
+            }
+            seen.push(f);
+            rings.push(self.region_world_rings(f[0], f[1])?);
+        }
+        solid_from_rings(&rings).ok().map(|o| o.volume())
+    }
+
+    /// sketchcraft E-37 (H-20261117-14): the live faces of sketches in the same context as
+    /// `[sketch, region]` reached from it across shared edges (itself included), as
+    /// `[sketch, region]` pairs: SketchUp's "select all connected" for loose faces.
+    pub fn connected_faces(&self, sketch: u64, region: u64) -> Vec<[u64; 2]> {
+        let Some(s0) = self.sketches.get(from_public::<SketchId>(sketch)) else {
+            return Vec::new();
+        };
+        let parent = s0.parent;
+        let mut keys: Vec<[u64; 2]> = Vec::new();
+        let mut rings: Vec<Vec<Vec<DVec3>>> = Vec::new();
+        for &k in &self.sketch_order {
+            let s = &self.sketches[k];
+            if s.parent != parent {
+                continue;
+            }
+            for (rid, _) in s.regions() {
+                let key = [to_public(k), to_public(rid)];
+                if let Some(r) = self.region_world_rings(key[0], key[1]) {
+                    keys.push(key);
+                    rings.push(r);
+                }
+            }
+        }
+        let Some(start) = keys.iter().position(|&k| k == [sketch, region]) else {
+            return Vec::new();
+        };
+        let (_, polys) = weld_rings(&rings);
+        let mut by_edge: BTreeMap<(usize, usize), Vec<usize>> = BTreeMap::new();
+        for (fi, f) in polys.iter().enumerate() {
+            for r in f {
+                for i in 0..r.len() {
+                    let (a, b) = (r[i], r[(i + 1) % r.len()]);
+                    by_edge.entry((a.min(b), a.max(b))).or_default().push(fi);
+                }
+            }
+        }
+        let mut seen = vec![false; keys.len()];
+        seen[start] = true;
+        let mut stack = vec![start];
+        while let Some(fi) = stack.pop() {
+            for f in &polys[fi] {
+                for i in 0..f.len() {
+                    let (a, b) = (f[i], f[(i + 1) % f.len()]);
+                    for &o in &by_edge[&(a.min(b), a.max(b))] {
+                        if !seen[o] {
+                            seen[o] = true;
+                            stack.push(o);
+                        }
+                    }
+                }
+            }
+        }
+        keys.into_iter()
+            .zip(seen)
+            .filter_map(|(k, s)| s.then_some(k))
+            .collect()
+    }
+
+    /// The world rings (outer first) of a live region, read only.
+    fn region_world_rings(&self, sketch: u64, region: u64) -> Option<Vec<Vec<DVec3>>> {
+        let s = self.sketches.get(from_public::<SketchId>(sketch))?;
+        let r = s.region(from_public::<RegionId>(region))?;
+        if r.consumed {
+            return None;
+        }
+        let sp = *s.plane();
+        let (o, h) = s.region_rings(r);
+        Some(
+            std::iter::once(&o)
+                .chain(h.iter())
+                .map(|ring| ring.iter().map(|&p| sp.to_world(p)).collect())
+                .collect(),
+        )
     }
 
     /// sketchcraft E-28: the world rings (outer first) of live regions `[sketch, region]`,

@@ -493,6 +493,30 @@ export function App() {
 
   const vcbRef = useRef<HTMLInputElement>(null);
   const kernelRef = useRef<KernelClient | null>(null);
+  /** sketchcraft E-36: the volume the selected loose faces close (null: they close none). */
+  const [closedVolume, setClosedVolume] = useState<number | null>(null);
+  // When four or more loose faces are selected, ask the kernel (read-only) whether they close
+  // a volume; the selection badge then shows it.
+  const sceneHash = scene?.state.stats.hash;
+  useEffect(() => {
+    const faces = selection.flatMap((x) => (x.kind === "region" ? [[x.sketch, x.region] as [number, number]] : []));
+    const k = kernelRef.current;
+    if (faces.length < 4 || !k) {
+      setClosedVolume(null);
+      return;
+    }
+    let stale = false;
+    k.closedFacesVolume(faces)
+      .then((v) => {
+        if (!stale) setClosedVolume(v);
+      })
+      .catch(() => {
+        if (!stale) setClosedVolume(null);
+      });
+    return () => {
+      stale = true;
+    };
+  }, [selection, sceneHash]);
   const engineRef = useRef<ViewportEngine | null>(null);
   // Latest state for the tool host (tools live outside React).
   const live = useRef({ scene, units, selection, target, vcbEditing: false, vcbFor: null as ToolId | null, lastError: null as string | null });
@@ -1369,6 +1393,15 @@ export function App() {
         const step: RememberedStep = { from: last.from, to, before, beforeTarget: last.target, after: live.current.selection, afterTarget: live.current.target };
         stepSelections.current = [...stepSelections.current.filter((s) => s.from !== step.from || s.to !== step.to).slice(-199), step];
       },
+      connectedFaces: async (sketch, region) => {
+        const k = kernelRef.current;
+        if (!k) return [];
+        try {
+          return await k.connectedFaces(sketch, region);
+        } catch {
+          return [];
+        }
+      },
       outline: async (t) => {
         const k = kernelRef.current;
         if (!k) return [];
@@ -1921,6 +1954,15 @@ export function App() {
     const faces = live.current.selection.flatMap((x) => (x.kind === "region" ? [[x.sketch, x.region] as [number, number]] : []));
     if (faces.length < 4) return void setMessage({ text: "Select the faces that close a volume (at least 4; Shift+click adds one).", error: true });
     const r = await apply({ op: "solid_from_faces", faces }, () => `Made a solid from ${plural(faces.length, "face")}.`);
+    if (r?.outcome.kind === "object_created") select([{ kind: "object", object: r.outcome.object }]);
+  }, [apply, select]);
+
+  /** sketchcraft E-04: Edit > Join Solids: the selected solids, touching or overlapping,
+   * become one (a roof slab joined to its house). */
+  const joinSolids = useCallback(async () => {
+    const objects = live.current.selection.flatMap((x) => (x.kind === "object" ? [x.object] : []));
+    if (objects.length < 2) return void setMessage({ text: "Select two solids or more to join (Shift+click adds one).", error: true });
+    const r = await apply({ op: "union_solids", objects }, () => `Joined ${objects.length} solids into one.`);
     if (r?.outcome.kind === "object_created") select([{ kind: "object", object: r.outcome.object }]);
   }, [apply, select]);
 
@@ -2763,7 +2805,7 @@ export function App() {
     if (st.meshes?.length) hud.push({ text: `${plural(st.meshes.length, "mesh")} not solid (imported)`, tone: "err" });
     if (selection.length) {
       // sketchcraft E-10: what the selection measures (faces' area, solids' volume).
-      const measured = describeMeasure(measureSelection(selection, st, scene?.mesh), units);
+      const measured = describeMeasure(measureSelection(selection, st, scene?.mesh), units, closedVolume);
       hud.push({ text: `Selection: ${selection.length}${measured ? ` · ${measured}` : ""}` });
     }
     else if (target && toolId === "pushpull") hud.push({ text: `Selected: ${describeTarget(target)}` });
@@ -2961,6 +3003,12 @@ export function App() {
           onSelect: () => void explodeSolids(),
         },
         {
+          label: "Join Solids",
+          title: "sketchcraft: the selected solids, touching or overlapping, become one (union)",
+          disabled: selection.filter((x) => x.kind === "object").length < 2,
+          onSelect: () => void joinSolids(),
+        },
+        {
           label: "Extrude Faces Along Axis…",
           title: "sketchcraft: the selected faces extruded together along an axis (blue by default) into one solid, e.g. a roof slab",
           disabled: !selection.some((x) => x.kind === "region"),
@@ -3090,7 +3138,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;

@@ -156,6 +156,9 @@ ctx.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       case "outline":
         res = { id: req.id, ok: true, rings: JSON.parse(document(mod).outline(req.part, req.owner, req.index)) };
         break;
+      case "facesQuery":
+        res = { id: req.id, ok: true, answer: JSON.parse(document(mod).faces_query(req.query, JSON.stringify(req.args))) };
+        break;
       case "offsetPreview":
         res = { id: req.id, ok: true, preview: JSON.parse(document(mod).offset_preview(JSON.stringify({ source: req.source, distance: req.distance }))) };
         break;
