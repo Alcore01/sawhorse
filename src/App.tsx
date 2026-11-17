@@ -1970,6 +1970,25 @@ export function App() {
     if (r?.outcome.kind === "object_created") select([{ kind: "object", object: r.outcome.object }]);
   }, [apply, select]);
 
+  /** sketchcraft E-40: Edit > Unify Imported Meshes: each imported mesh, one undo step
+   * each, rebuilt as a solid from its roof; what each became, or why not, in a report. */
+  const unifyMeshes = useCallback(async () => {
+    const meshes = live.current.scene?.state.meshes ?? [];
+    const lines: string[] = [];
+    const made: number[] = [];
+    for (const m of meshes) {
+      const r = await apply({ op: "unify_mesh", mesh: m.id }, () => `Unified ${m.name}.`);
+      if (r?.outcome.kind === "mesh_unified") {
+        made.push(r.outcome.object);
+        lines.push(`${m.name}: ${r.outcome.notes.join("; ")}`);
+      } else {
+        lines.push(`${m.name}: ${live.current.lastError ?? "refused"}`);
+      }
+    }
+    if (made.length) select(made.map((object) => ({ kind: "object" as const, object })));
+    setReport({ title: `Unified ${made.length} of ${plural(meshes.length, "imported mesh")}`, lines, error: made.length < meshes.length });
+  }, [apply, select]);
+
   /** sketchcraft E-04: Edit > Join Solids: the selected solids, touching or overlapping,
    * become one (a roof slab joined to its house). */
   const joinSolids = useCallback(async () => {
@@ -3057,6 +3076,12 @@ export function App() {
           onSelect: () => void apply({ op: "leave_context" }, (r) => `Closed it. Editing ${contextTrail(r.scene.state.graph)}.`),
         },
         {
+          label: "Unify Imported Meshes",
+          title: "sketchcraft: each imported building mesh that is not a solid (a GeoHVAC .dae) rebuilt as one solid from its roof: roof pieces sewn, upright walls, a flat floor",
+          disabled: !st?.meshes?.length,
+          onSelect: () => void unifyMeshes(),
+        },
+        {
           label: "Delete Imported Meshes",
           title: "Imported geometry that is not a solid",
           disabled: !st?.meshes?.length,
@@ -3151,7 +3176,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;

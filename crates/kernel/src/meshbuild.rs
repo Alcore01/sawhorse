@@ -398,6 +398,11 @@ fn weld(points: &[DVec3]) -> (Vec<DVec3>, Vec<u32>) {
     weld_within(points, POINT_MERGE)
 }
 
+/// sketchcraft E-40: [`weld_within`] for the model (welded points, and each input's index).
+pub(crate) fn weld_points(points: &[DVec3], gap: f64) -> (Vec<DVec3>, Vec<u32>) {
+    weld_within(points, gap)
+}
+
 /// Weld points closer than `gap` (the first occurrence wins).
 fn weld_within(points: &[DVec3], gap: f64) -> (Vec<DVec3>, Vec<u32>) {
     let cell = gap;

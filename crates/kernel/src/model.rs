@@ -338,6 +338,13 @@ pub enum Op {
     UnionSolids {
         objects: Vec<u64>,
     },
+    /// sketchcraft E-40: an imported building mesh that is not a solid (GeoHVAC's .dae:
+    /// roof pieces a few centimetres apart, walls and floor not sewn) rebuilt as one solid
+    /// from its roof: the roof welded, vertical walls from its outline down to the floor
+    /// (and up or down the steps between roof parts), a flat floor. The mesh goes.
+    UnifyMesh {
+        mesh: u64,
+    },
     /// Delete a group or instance and everything in it.
     DeleteNode {
         node: u64,
@@ -999,6 +1006,11 @@ pub enum OpOutcome {
     Exploded {
         objects: Vec<u64>,
         nodes: Vec<u64>,
+    },
+    /// sketchcraft E-40: a mesh rebuilt as the solid `object`; `notes` say how.
+    MeshUnified {
+        object: u64,
+        notes: Vec<String>,
     },
     /// sketchcraft E-28: a solid became `face_count` plain faces.
     SolidExploded {
@@ -2465,6 +2477,7 @@ impl Model {
             Op::SolidFromFaces { faces } => self.solid_from_faces(faces),
             Op::ExtrudeFaces { faces, vector } => self.extrude_faces(faces, *vector),
             Op::UnionSolids { objects } => self.union_solids(objects),
+            Op::UnifyMesh { mesh } => self.unify_mesh(*mesh),
             Op::DeleteNode { node } => self.delete_node(*node),
             Op::Rename { item, name } => self.rename(*item, name.as_deref()),
             Op::RenameDefinition { definition, name } => self.rename_definition(*definition, name),
@@ -4511,6 +4524,28 @@ impl Model {
         })
     }
 
+    /// sketchcraft E-40 (H-20261117-17): see [`Op::UnifyMesh`].
+    fn unify_mesh(&mut self, mesh: u64) -> Result<OpOutcome, KernelError> {
+        let k = from_public::<MeshId>(mesh);
+        if !self.meshes.contains_key(k) {
+            return Err(DocumentError::NoSuchMesh(mesh).into());
+        }
+        self.editable_mesh(k)?;
+        let m = self.meshes[k].clone();
+        let (mut obj, notes) = unify_25d(&m.positions, &m.faces, UNIFY_GAP)?;
+        obj.member.parent = m.member.parent;
+        obj.name = Some(m.name.clone());
+        obj.tag = m.tag.clone();
+        self.meshes.remove(k);
+        self.mesh_order.retain(|&x| x != k);
+        let id = self.insert_object(obj);
+        self.mark(m.member.parent);
+        Ok(OpOutcome::MeshUnified {
+            object: to_public(id),
+            notes,
+        })
+    }
+
     /// sketchcraft E-04 (H-20261117-14): see [`Op::UnionSolids`].
     fn union_solids(&mut self, objects: &[u64]) -> Result<OpOutcome, KernelError> {
         let mut keys: Vec<ObjectId> = Vec::new();
@@ -5021,6 +5056,255 @@ fn face_groups(polys: &[Vec<Vec<usize>>]) -> Vec<Vec<usize>> {
         groups.push(g);
     }
     groups
+}
+
+/// sketchcraft E-40: how far apart (metres) the pieces of an imported roof may be and still
+/// be sewn together (GeoHVAC's are 1 to 2 cm apart).
+pub const UNIFY_GAP: f64 = 0.03;
+
+/// sketchcraft E-40 (H-20261117-17): a 2.5D building (walls upright, under a roof) rebuilt
+/// from an imported mesh's roof: its faces facing up or down by more than about 12° and
+/// above the floor band, welded within `gap` (and their corners brought to one plan
+/// position within `gap`), each outline edge of the roof gets a vertical wall: down to the
+/// floor, or, where another roof edge lies under or over it in plan (a step between two roof
+/// parts), up or down to that edge; the floor is flat at the walls' foot (the median height
+/// of the lowest half metre of points). The mesh's own walls and floor are not used.
+fn unify_25d(
+    positions: &[DVec3],
+    faces: &[Vec<Vec<u32>>],
+    gap: f64,
+) -> Result<(Object, Vec<String>), KernelError> {
+    let refuse = |m: &str| not_a_volume(&format!("this mesh cannot be unified: {m}"));
+    if positions.is_empty() || faces.is_empty() {
+        return Err(refuse("it is empty"));
+    }
+    // The floor: the median of the points within half a metre of the lowest.
+    let zmin = positions.iter().map(|p| p.z).fold(f64::INFINITY, f64::min);
+    let mut low: Vec<f64> = positions
+        .iter()
+        .map(|p| p.z)
+        .filter(|&z| z <= zmin + 0.5)
+        .collect();
+    low.sort_by(f64::total_cmp);
+    let z0 = low[low.len() / 2];
+    // The roof faces (outer rings only).
+    let mut roof_pts: Vec<DVec3> = Vec::new();
+    let mut roof_rings: Vec<Vec<usize>> = Vec::new();
+    for f in faces {
+        let Some(outer) = f.first() else { continue };
+        let ring: Vec<DVec3> = outer
+            .iter()
+            .filter_map(|&i| positions.get(i as usize).copied())
+            .collect();
+        if ring.len() < 3 {
+            continue;
+        }
+        let Some(n) = newell(&ring) else { continue };
+        let c = ring.iter().fold(DVec3::ZERO, |a, &p| a + p) / ring.len() as f64;
+        if n.z.abs() <= 0.2 || c.z <= z0 + 0.3 {
+            continue;
+        }
+        let base = roof_pts.len();
+        roof_pts.extend(ring.iter().copied());
+        roof_rings.push((base..roof_pts.len()).collect());
+    }
+    if roof_rings.is_empty() {
+        return Err(refuse("no roof faces found above the floor"));
+    }
+    // Weld in space, then bring corners close in plan to one plan position.
+    let (mut pts, map) = {
+        let (p, m) = crate::meshbuild::weld_points(&roof_pts, gap);
+        (p, m)
+    };
+    for i in 0..pts.len() {
+        for j in 0..i {
+            if pts[j].truncate().distance(pts[i].truncate()) <= gap {
+                pts[i].x = pts[j].x;
+                pts[i].y = pts[j].y;
+                break;
+            }
+        }
+    }
+    let mut roof: Vec<Vec<usize>> = Vec::new();
+    for r in &roof_rings {
+        let mut q: Vec<usize> = Vec::new();
+        for &i in r {
+            let j = map[i] as usize;
+            if q.last() != Some(&j) {
+                q.push(j);
+            }
+        }
+        while q.len() > 1 && q.first() == q.last() {
+            q.pop();
+        }
+        if q.len() < 3 {
+            continue;
+        }
+        let w: Vec<DVec3> = q.iter().map(|&i| pts[i]).collect();
+        let Some(n) = newell(&w) else { continue };
+        if n.z < 0.0 {
+            q.reverse();
+        }
+        roof.push(q);
+    }
+    let mut uses: BTreeMap<(usize, usize), usize> = BTreeMap::new();
+    for r in &roof {
+        for k in 0..r.len() {
+            let (a, b) = (r[k], r[(k + 1) % r.len()]);
+            *uses.entry((a.min(b), a.max(b))).or_default() += 1;
+        }
+    }
+    if uses.values().any(|&n| n > 2) {
+        return Err(refuse(
+            "its roof faces overlap (an edge shared by three faces)",
+        ));
+    }
+    // The roof's outline, in its faces' direction (anticlockwise seen from above).
+    let mut rim: Vec<(DVec3, DVec3)> = Vec::new();
+    for r in &roof {
+        for k in 0..r.len() {
+            let (a, b) = (r[k], r[(k + 1) % r.len()]);
+            if uses[&(a.min(b), a.max(b))] == 1 {
+                rim.push((pts[a], pts[b]));
+            }
+        }
+    }
+    // Cut each outline edge where another's corner lies over or under it in plan (its height
+    // there is the edge's own, interpolated), so steps pair edge for edge.
+    let corners: Vec<DVec3> = rim.iter().flat_map(|&(a, b)| [a, b]).collect();
+    let mut cut: Vec<(DVec3, DVec3)> = Vec::new();
+    for &(a, b) in &rim {
+        let (a2, d2) = (a.truncate(), (b - a).truncate());
+        let len2 = d2.length_squared();
+        let mut on: Vec<f64> = Vec::new();
+        if len2 > 0.0 {
+            for c in &corners {
+                let t = (c.truncate() - a2).dot(d2) / len2;
+                if t > 1e-9 && t < 1.0 - 1e-9 && (a2 + d2 * t).distance(c.truncate()) <= 1e-9 {
+                    on.push(t);
+                }
+            }
+        }
+        on.sort_by(f64::total_cmp);
+        on.dedup_by(|x, y| (*x - *y).abs() < 1e-12);
+        let mut prev = a;
+        for t in on {
+            let p = a + (b - a) * t;
+            cut.push((prev, p));
+            prev = p;
+        }
+        cut.push((prev, b));
+    }
+    let same_xy = |p: DVec3, q: DVec3| p.truncate().distance(q.truncate()) <= 1e-9;
+    let mut paired = vec![false; cut.len()];
+    let mut rings: Vec<Vec<Vec<DVec3>>> = roof
+        .iter()
+        .map(|r| vec![r.iter().map(|&i| pts[i]).collect()])
+        .collect();
+    let mut steps = 0usize;
+    for i in 0..cut.len() {
+        if paired[i] {
+            continue;
+        }
+        let (a, b) = cut[i];
+        if let Some(j) =
+            (i + 1..cut.len()).find(|&j| !paired[j] && same_xy(a, cut[j].1) && same_xy(b, cut[j].0))
+        {
+            paired[i] = true;
+            paired[j] = true;
+            let (c, d) = cut[j];
+            let mut ring: Vec<DVec3> = Vec::new();
+            for p in [a, b, c, d] {
+                if ring.last().is_none_or(|q: &DVec3| q.distance(p) > 1e-12) {
+                    ring.push(p);
+                }
+            }
+            if ring.len() > 1 && ring[0].distance(ring[ring.len() - 1]) <= 1e-12 {
+                ring.pop();
+            }
+            if ring.len() >= 3 {
+                rings.push(vec![ring]);
+                steps += 1;
+            }
+        }
+    }
+    // Outer walls, down to the floor, and the floor's outline.
+    let foot = |p: DVec3| DVec3::new(p.x, p.y, z0);
+    let outer: Vec<(DVec3, DVec3)> = (0..cut.len())
+        .filter(|&i| !paired[i])
+        .map(|i| cut[i])
+        .collect();
+    for &(a, b) in &outer {
+        if a.z <= z0 + 1e-6 || b.z <= z0 + 1e-6 {
+            return Err(refuse("a roof edge is at or below the floor"));
+        }
+        rings.push(vec![vec![a, b, foot(b), foot(a)]]);
+    }
+    // Floor loops: outline edges chained end to start in plan.
+    let mut left: Vec<(DVec3, DVec3)> = outer.clone();
+    let mut loops: Vec<Vec<DVec3>> = Vec::new();
+    while let Some(first) = left.pop() {
+        let mut lp = vec![foot(first.0)];
+        let mut at = first.1;
+        let mut guard = 0;
+        while !same_xy(at, first.0) {
+            let Some(k) = left.iter().position(|e| same_xy(e.0, at)) else {
+                return Err(refuse("its roof outline does not close in plan"));
+            };
+            lp.push(foot(at));
+            at = left.swap_remove(k).1;
+            guard += 1;
+            if guard > outer.len() {
+                return Err(refuse("its roof outline does not close in plan"));
+            }
+        }
+        loops.push(lp);
+    }
+    let area = |r: &[DVec3]| -> f64 {
+        (0..r.len())
+            .map(|i| {
+                let (p, q) = (r[i], r[(i + 1) % r.len()]);
+                p.x * q.y - q.x * p.y
+            })
+            .sum::<f64>()
+            / 2.0
+    };
+    let inside = |p: DVec3, r: &[DVec3]| -> bool {
+        let mut c = false;
+        for i in 0..r.len() {
+            let (a, b) = (r[i], r[(i + 1) % r.len()]);
+            if (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x {
+                c = !c;
+            }
+        }
+        c
+    };
+    let (outs, holes): (Vec<Vec<DVec3>>, Vec<Vec<DVec3>>) =
+        loops.into_iter().partition(|l| area(l) > 0.0);
+    if outs.is_empty() {
+        return Err(refuse("its roof has no outline"));
+    }
+    let mut floors: Vec<Vec<Vec<DVec3>>> = outs.iter().map(|o| vec![o.clone()]).collect();
+    for h in holes {
+        if let Some(f) = floors.iter_mut().find(|f| inside(h[0], &f[0])) {
+            f.push(h);
+        } else {
+            return Err(refuse("a hole in its outline lies outside it"));
+        }
+    }
+    rings.extend(floors);
+    let obj = solid_from_rings(&rings)
+        .map_err(|e| refuse(&e.to_string().replace("these faces ", "the rebuilt faces ")))?;
+    let notes = vec![format!(
+        "rebuilt from its roof: {} roof face{}, {} step wall{} between roof parts, floor at {:.2} m; roof pieces within {:.0} cm sewn together; its own walls and floor were left out",
+        roof.len(),
+        if roof.len() == 1 { "" } else { "s" },
+        steps,
+        if steps == 1 { "" } else { "s" },
+        z0,
+        gap * 100.0
+    )];
+    Ok((obj, notes))
 }
 
 fn not_a_volume(m: &str) -> KernelError {

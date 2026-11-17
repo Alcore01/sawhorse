@@ -61,6 +61,8 @@ export type KernelOp =
   | { op: "extrude_faces"; faces: [number, number][]; vector: [number, number, number] }
   // sketchcraft E-04: solids that touch or overlap become one.
   | { op: "union_solids"; objects: number[] }
+  // sketchcraft E-40: an imported building mesh rebuilt as one solid from its roof.
+  | { op: "unify_mesh"; mesh: number }
   | { op: "delete_node"; node: number }
   | { op: "rename"; item: Item; name: string | null }
   | { op: "rename_definition"; definition: number; name: string }
@@ -390,6 +392,7 @@ export type OpOutcome =
   | { kind: "style_set" }
   | { kind: "renamed" }
   | { kind: "mesh_deleted" }
+  | { kind: "mesh_unified"; object: number; notes: string[] }
   | { kind: "part_set" }
   | { kind: "loose_grouped"; groups: number[] }
   | { kind: "edges_set"; changed: number }
