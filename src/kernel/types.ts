@@ -58,6 +58,7 @@ export type KernelOp =
   // sketchcraft E-28: a solid into plain faces; closed faces into a solid.
   | { op: "explode_solid"; object: number }
   | { op: "solid_from_faces"; faces: [number, number][] }
+  | { op: "extrude_faces"; faces: [number, number][]; vector: [number, number, number] }
   | { op: "delete_node"; node: number }
   | { op: "rename"; item: Item; name: string | null }
   | { op: "rename_definition"; definition: number; name: string }

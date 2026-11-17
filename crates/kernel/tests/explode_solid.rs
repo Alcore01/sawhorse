@@ -154,3 +154,77 @@ fn a_box_with_its_top_replaced_by_a_gable_roof_is_a_solid() {
         m.stats().volume_m3
     );
 }
+
+/// The two slopes of a gable roof over a 2 x 1 m box, ridge 0.5 m above the eaves.
+fn roof() -> Model {
+    let mut m = Model::with_ground_sketch();
+    let s = 0.5f64.hypot(0.5);
+    for (origin, normal, pts) in [
+        (
+            [0.0, 0.0, 1.0],
+            [0.0, -0.5 / s, 0.5 / s],
+            [
+                [0.0, 0.0, 1.0],
+                [2.0, 0.0, 1.0],
+                [2.0, 0.5, 1.5],
+                [0.0, 0.5, 1.5],
+            ],
+        ),
+        (
+            [0.0, 1.0, 1.0],
+            [0.0, 0.5 / s, 0.5 / s],
+            [
+                [0.0, 1.0, 1.0],
+                [2.0, 1.0, 1.0],
+                [2.0, 0.5, 1.5],
+                [0.0, 0.5, 1.5],
+            ],
+        ),
+    ] {
+        m.apply(&Op::Draw {
+            target: DrawTarget::Plane { origin, normal },
+            points: pts.to_vec(),
+            closed: true,
+            curve: None,
+        })
+        .unwrap();
+    }
+    m
+}
+
+#[test]
+fn both_roof_slopes_extrude_together_straight_up() {
+    // sketchcraft E-30 (JC, 17 nov. 2026, 08 h 13): a 30 cm slab over both slopes, along
+    // blue, not along each slope's normal.
+    let mut m = roof();
+    let f: Vec<[u64; 2]> = faces(&m).into_iter().map(|x| x.0).collect();
+    assert_eq!(f.len(), 2);
+    let out = m
+        .apply(&Op::ExtrudeFaces {
+            faces: f,
+            vector: [0.0, 0.0, 0.3],
+        })
+        .unwrap();
+    assert!(matches!(out, OpOutcome::ObjectCreated { .. }), "{out:?}");
+    assert!(m.stats().watertight);
+    assert!(
+        (m.stats().volume_m3 - 0.6).abs() < 1e-9,
+        "plan area 2 m² x 0.3 m: {}",
+        m.stats().volume_m3
+    );
+    assert_eq!(faces(&m).len(), 2, "the slopes stay");
+}
+
+#[test]
+fn faces_extruded_along_their_own_plane_are_refused() {
+    let mut m = roof();
+    let f: Vec<[u64; 2]> = faces(&m).into_iter().map(|x| x.0).collect();
+    let err = m
+        .apply(&Op::ExtrudeFaces {
+            faces: f,
+            vector: [1.0, 0.0, 0.0],
+        })
+        .unwrap_err();
+    assert!(err.to_string().contains("no volume"), "{err}");
+    assert!(m.objects().is_empty());
+}

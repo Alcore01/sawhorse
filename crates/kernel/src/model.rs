@@ -326,6 +326,13 @@ pub enum Op {
     SolidFromFaces {
         faces: Vec<[u64; 2]>,
     },
+    /// sketchcraft E-30: faces (`[sketch, region]` pairs, touching or not) extruded
+    /// together along `vector` (metres) into one solid: a roof slab raised straight up from
+    /// both slopes. The faces stay.
+    ExtrudeFaces {
+        faces: Vec<[u64; 2]>,
+        vector: [f64; 3],
+    },
     /// Delete a group or instance and everything in it.
     DeleteNode {
         node: u64,
@@ -2451,6 +2458,7 @@ impl Model {
             Op::Explode { node } => self.explode(*node),
             Op::ExplodeSolid { object } => self.explode_solid(*object),
             Op::SolidFromFaces { faces } => self.solid_from_faces(faces),
+            Op::ExtrudeFaces { faces, vector } => self.extrude_faces(faces, *vector),
             Op::DeleteNode { node } => self.delete_node(*node),
             Op::Rename { item, name } => self.rename(*item, name.as_deref()),
             Op::RenameDefinition { definition, name } => self.rename_definition(*definition, name),
@@ -4400,16 +4408,87 @@ impl Model {
         self.mark(removed.member.parent);
         Ok(OpOutcome::SolidExploded { face_count: faces })
     }
-
     /// sketchcraft E-28 (H-20261117-5): see [`Op::SolidFromFaces`].
     fn solid_from_faces(&mut self, faces: &[[u64; 2]]) -> Result<OpOutcome, KernelError> {
-        let refuse = |m: &str| -> KernelError { DocumentError::NotAVolume(m.into()).into() };
         if faces.len() < 4 {
-            return Err(refuse(
+            return Err(not_a_volume(
                 "a volume needs at least 4 faces: select the faces that close it",
             ));
         }
-        // The rings of each face in world space, outer first.
+        let (rings_of, used) = self.face_rings(faces)?;
+        let mut obj = solid_from_rings(&rings_of)?;
+        obj.member.parent = self.context;
+        for &(sid, rid) in &used {
+            self.sketches[sid].consume_region(rid)?;
+        }
+        let id = self.insert_object(obj);
+        self.mark(self.context);
+        Ok(OpOutcome::ObjectCreated {
+            object: to_public(id),
+        })
+    }
+
+    /// sketchcraft E-30 (H-20261117-7): see [`Op::ExtrudeFaces`].
+    fn extrude_faces(
+        &mut self,
+        faces: &[[u64; 2]],
+        vector: [f64; 3],
+    ) -> Result<OpOutcome, KernelError> {
+        let v = DVec3::from_array(vector);
+        if !v.is_finite() || v.length() <= PLANARITY {
+            return Err(not_a_volume("give a distance to extrude along"));
+        }
+        if faces.is_empty() {
+            return Err(not_a_volume("select the faces to extrude"));
+        }
+        let (bottom, _) = self.face_rings(faces)?;
+        for f in &bottom {
+            if newell(&f[0]).is_none_or(|n| n.dot(v).abs() <= 1e-9 * v.length()) {
+                return Err(not_a_volume(
+                    "a face lies along that direction: it would make no volume",
+                ));
+            }
+        }
+        let (points, polys) = weld_rings(&bottom);
+        let mut uses: BTreeMap<(usize, usize), Vec<(usize, usize)>> = BTreeMap::new();
+        for f in &polys {
+            for r in f {
+                for i in 0..r.len() {
+                    let (a, b) = (r[i], r[(i + 1) % r.len()]);
+                    uses.entry((a.min(b), a.max(b))).or_default().push((a, b));
+                }
+            }
+        }
+        if uses.values().any(|u| u.len() > 2) {
+            return Err(not_a_volume("an edge joins more than two of these faces"));
+        }
+        // The faces, the faces moved along `v`, and a side along every edge on the rim.
+        let mut rings: Vec<Vec<Vec<DVec3>>> = bottom.clone();
+        rings.extend(bottom.iter().map(|f| {
+            f.iter()
+                .map(|r| r.iter().map(|&p| p + v).collect())
+                .collect()
+        }));
+        for u in uses.values().filter(|u| u.len() == 1) {
+            let (pa, pb) = (points[u[0].0], points[u[0].1]);
+            rings.push(vec![vec![pa, pb, pb + v, pa + v]]);
+        }
+        let mut obj = solid_from_rings(&rings)?;
+        obj.member.parent = self.context;
+        let id = self.insert_object(obj);
+        self.mark(self.context);
+        Ok(OpOutcome::ObjectCreated {
+            object: to_public(id),
+        })
+    }
+
+    /// sketchcraft E-28: the world rings (outer first) of live regions `[sketch, region]`,
+    /// each once, with their keys.
+    #[allow(clippy::type_complexity)]
+    fn face_rings(
+        &mut self,
+        faces: &[[u64; 2]],
+    ) -> Result<(Vec<Vec<Vec<DVec3>>>, Vec<(SketchId, RegionId)>), KernelError> {
         let mut rings_of: Vec<Vec<Vec<DVec3>>> = Vec::new();
         let mut used: Vec<(SketchId, RegionId)> = Vec::new();
         for &[sk, rg] in faces {
@@ -4429,148 +4508,7 @@ impl Model {
             rings_of.push(std::iter::once(&o).chain(h.iter()).map(w).collect());
             used.push((sid, rid));
         }
-        // Weld the corners, then split each side at the corners lying on it (T-junctions).
-        let mut points: Vec<DVec3> = Vec::new();
-        let index = |p: DVec3, points: &mut Vec<DVec3>| -> usize {
-            if let Some(i) = points.iter().position(|q| q.distance(p) <= PLANARITY) {
-                return i;
-            }
-            points.push(p);
-            points.len() - 1
-        };
-        let idx: Vec<Vec<Vec<usize>>> = rings_of
-            .iter()
-            .map(|f| {
-                f.iter()
-                    .map(|r| r.iter().map(|&p| index(p, &mut points)).collect())
-                    .collect()
-            })
-            .collect();
-        let split = |ring: &Vec<usize>| -> Vec<usize> {
-            let mut out = Vec::new();
-            for i in 0..ring.len() {
-                let (a, b) = (ring[i], ring[(i + 1) % ring.len()]);
-                out.push(a);
-                let (pa, d) = (points[a], points[b] - points[a]);
-                let mut on: Vec<(f64, usize)> = (0..points.len())
-                    .filter(|&j| j != a && j != b)
-                    .filter_map(|j| {
-                        let t = (points[j] - pa).dot(d) / d.length_squared();
-                        (t > 0.0 && t < 1.0 && (pa + d * t).distance(points[j]) <= PLANARITY)
-                            .then_some((t, j))
-                    })
-                    .collect();
-                on.sort_by(|x, y| x.0.total_cmp(&y.0));
-                out.extend(on.into_iter().map(|(_, j)| j));
-            }
-            out
-        };
-        let mut polys: Vec<Vec<Vec<usize>>> =
-            idx.iter().map(|f| f.iter().map(&split).collect()).collect();
-        // Every side shared by exactly two faces, run once each way (turn faces to agree).
-        let mut uses: BTreeMap<(usize, usize), Vec<usize>> = BTreeMap::new();
-        for (fi, f) in polys.iter().enumerate() {
-            for r in f {
-                for i in 0..r.len() {
-                    let (a, b) = (r[i], r[(i + 1) % r.len()]);
-                    uses.entry((a.min(b), a.max(b))).or_default().push(fi);
-                }
-            }
-        }
-        if uses.values().any(|v| v.len() != 2) {
-            return Err(refuse(
-                "these faces do not close a volume: every edge must join exactly two of them",
-            ));
-        }
-        let dir = |f: &Vec<Vec<usize>>, a: usize, b: usize| -> bool {
-            f.iter()
-                .any(|r| (0..r.len()).any(|i| r[i] == a && r[(i + 1) % r.len()] == b))
-        };
-        let mut flip: Vec<Option<bool>> = vec![None; polys.len()];
-        let mut stack = vec![0usize];
-        flip[0] = Some(false);
-        while let Some(fi) = stack.pop() {
-            for (&(a, b), v) in &uses {
-                if !v.contains(&fi) {
-                    continue;
-                }
-                let other = if v[0] == fi { v[1] } else { v[0] };
-                if other == fi {
-                    return Err(refuse("a face meets itself along an edge"));
-                }
-                let mine = dir(&polys[fi], a, b) != flip[fi].unwrap();
-                let theirs = dir(&polys[other], a, b);
-                let want = mine == theirs; // same way: the other must turn
-                match flip[other] {
-                    None => {
-                        flip[other] = Some(want);
-                        stack.push(other);
-                    }
-                    Some(f) if f != want => {
-                        return Err(refuse(
-                            "these faces cannot all face outward (a twisted shell)",
-                        ));
-                    }
-                    _ => {}
-                }
-            }
-        }
-        if flip.iter().any(Option::is_none) {
-            return Err(refuse(
-                "these faces make more than one piece: select one closed volume",
-            ));
-        }
-        for (f, fl) in polys.iter_mut().zip(&flip) {
-            if fl.unwrap() {
-                for r in f.iter_mut() {
-                    r.reverse();
-                }
-            }
-        }
-        let volume: f64 = polys
-            .iter()
-            .flatten()
-            .map(|r| {
-                (1..r.len().saturating_sub(1))
-                    .map(|i| points[r[0]].dot(points[r[i]].cross(points[r[i + 1]])))
-                    .sum::<f64>()
-            })
-            .sum::<f64>()
-            / 6.0;
-        if volume.abs() <= PLANARITY {
-            return Err(refuse("these faces enclose no volume"));
-        }
-        if volume < 0.0 {
-            for r in polys.iter_mut().flatten() {
-                r.reverse();
-            }
-        }
-        let pfaces: Vec<crate::brep::PolyFace> = polys
-            .into_iter()
-            .map(|mut f| {
-                let outer = f.remove(0);
-                crate::brep::PolyFace::new(outer, f)
-            })
-            .collect();
-        let brep = crate::brep::Brep::build(&crate::brep::Polys {
-            points,
-            faces: pfaces,
-            user_edges: Default::default(),
-        })
-        .map_err(|e| refuse(&format!("these faces do not make a solid: {e}")))?;
-        let mut obj = Object::from_brep(brep);
-        if !obj.watertight || obj.validate().is_err() {
-            return Err(refuse("these faces do not make a closed solid"));
-        }
-        obj.member.parent = self.context;
-        for &(sid, rid) in &used {
-            self.sketches[sid].consume_region(rid)?;
-        }
-        let id = self.insert_object(obj);
-        self.mark(self.context);
-        Ok(OpOutcome::ObjectCreated {
-            object: to_public(id),
-        })
+        Ok((rings_of, used))
     }
 
     /// sketchcraft E-25 (H-20261117-3): every edge (world) of the solids directly in the
@@ -4897,6 +4835,162 @@ fn straight(pts: &[DVec3]) -> bool {
 /// sketchcraft E-19: into `s` (on `plane`), the `foreign` edges connected to the stroke
 /// `pts` (through shared ends, edge after edge), kept only when they close a loop: the
 /// regions their insertion bounds; `s` is left as it was when there are none.
+fn not_a_volume(m: &str) -> KernelError {
+    DocumentError::NotAVolume(m.into()).into()
+}
+
+/// sketchcraft E-28: rings (world) welded to shared corners, each side split at the corners
+/// lying on it (T-junctions): the points and, per face, its rings as indices.
+#[allow(clippy::type_complexity)]
+fn weld_rings(rings_of: &[Vec<Vec<DVec3>>]) -> (Vec<DVec3>, Vec<Vec<Vec<usize>>>) {
+    let mut points: Vec<DVec3> = Vec::new();
+    let mut idx: Vec<Vec<Vec<usize>>> = Vec::new();
+    for f in rings_of {
+        let mut fr = Vec::new();
+        for r in f {
+            let mut ri = Vec::new();
+            for &p in r {
+                let i = match points.iter().position(|q| q.distance(p) <= PLANARITY) {
+                    Some(i) => i,
+                    None => {
+                        points.push(p);
+                        points.len() - 1
+                    }
+                };
+                if ri.last() != Some(&i) {
+                    ri.push(i);
+                }
+            }
+            fr.push(ri);
+        }
+        idx.push(fr);
+    }
+    let split = |ring: &Vec<usize>| -> Vec<usize> {
+        let mut out = Vec::new();
+        for i in 0..ring.len() {
+            let (a, b) = (ring[i], ring[(i + 1) % ring.len()]);
+            out.push(a);
+            let (pa, d) = (points[a], points[b] - points[a]);
+            let mut on: Vec<(f64, usize)> = (0..points.len())
+                .filter(|&j| j != a && j != b)
+                .filter_map(|j| {
+                    let t = (points[j] - pa).dot(d) / d.length_squared();
+                    (t > 0.0 && t < 1.0 && (pa + d * t).distance(points[j]) <= PLANARITY)
+                        .then_some((t, j))
+                })
+                .collect();
+            on.sort_by(|x, y| x.0.total_cmp(&y.0));
+            out.extend(on.into_iter().map(|(_, j)| j));
+        }
+        out
+    };
+    let polys = idx.iter().map(|f| f.iter().map(&split).collect()).collect();
+    (points, polys)
+}
+
+/// sketchcraft E-28: a solid from face rings (world, outer first) that close a volume:
+/// welded, turned to face outward, built and checked; else why not.
+fn solid_from_rings(rings_of: &[Vec<Vec<DVec3>>]) -> Result<Object, KernelError> {
+    let refuse = not_a_volume;
+    let (points, mut polys) = weld_rings(rings_of);
+    // Every side shared by exactly two faces, run once each way (turn faces to agree).
+    let mut uses: BTreeMap<(usize, usize), Vec<usize>> = BTreeMap::new();
+    for (fi, f) in polys.iter().enumerate() {
+        for r in f {
+            for i in 0..r.len() {
+                let (a, b) = (r[i], r[(i + 1) % r.len()]);
+                uses.entry((a.min(b), a.max(b))).or_default().push(fi);
+            }
+        }
+    }
+    if uses.values().any(|v| v.len() != 2) {
+        return Err(refuse(
+            "these faces do not close a volume: every edge must join exactly two of them",
+        ));
+    }
+    let dir = |f: &Vec<Vec<usize>>, a: usize, b: usize| -> bool {
+        f.iter()
+            .any(|r| (0..r.len()).any(|i| r[i] == a && r[(i + 1) % r.len()] == b))
+    };
+    let mut flip: Vec<Option<bool>> = vec![None; polys.len()];
+    let mut stack = vec![0usize];
+    flip[0] = Some(false);
+    while let Some(fi) = stack.pop() {
+        for (&(a, b), v) in &uses {
+            if !v.contains(&fi) {
+                continue;
+            }
+            let other = if v[0] == fi { v[1] } else { v[0] };
+            if other == fi {
+                return Err(refuse("a face meets itself along an edge"));
+            }
+            let mine = dir(&polys[fi], a, b) != flip[fi].unwrap_or(false);
+            let theirs = dir(&polys[other], a, b);
+            let want = mine == theirs; // same way: the other must turn
+            match flip[other] {
+                None => {
+                    flip[other] = Some(want);
+                    stack.push(other);
+                }
+                Some(f) if f != want => {
+                    return Err(refuse(
+                        "these faces cannot all face outward (a twisted shell)",
+                    ));
+                }
+                _ => {}
+            }
+        }
+    }
+    if flip.iter().any(Option::is_none) {
+        return Err(refuse(
+            "these faces make more than one piece: select one closed volume",
+        ));
+    }
+    for (f, fl) in polys.iter_mut().zip(&flip) {
+        if *fl == Some(true) {
+            for r in f.iter_mut() {
+                r.reverse();
+            }
+        }
+    }
+    let volume: f64 = polys
+        .iter()
+        .flatten()
+        .map(|r| {
+            (1..r.len().saturating_sub(1))
+                .map(|i| points[r[0]].dot(points[r[i]].cross(points[r[i + 1]])))
+                .sum::<f64>()
+        })
+        .sum::<f64>()
+        / 6.0;
+    if volume.abs() <= PLANARITY {
+        return Err(refuse("these faces enclose no volume"));
+    }
+    if volume < 0.0 {
+        for r in polys.iter_mut().flatten() {
+            r.reverse();
+        }
+    }
+    let pfaces: Vec<crate::brep::PolyFace> = polys
+        .into_iter()
+        .map(|mut f| {
+            let outer = f.remove(0);
+            crate::brep::PolyFace::new(outer, f)
+        })
+        .collect();
+    let brep = crate::brep::Brep::build(&crate::brep::Polys {
+        points,
+        faces: pfaces,
+        user_edges: Default::default(),
+    })
+    .map_err(|e| refuse(&format!("these faces do not make a solid: {e}")))?;
+    let obj = Object::from_brep(brep);
+    if !obj.watertight || obj.validate().is_err() {
+        return Err(refuse("these faces do not make a closed solid"));
+    }
+    Ok(obj)
+}
+
 /// sketchcraft E-28: the normal of a planar ring (Newell), if it has an area.
 fn newell(ring: &[DVec3]) -> Option<DVec3> {
     let mut n = DVec3::ZERO;

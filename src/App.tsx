@@ -68,6 +68,7 @@ import { EXPORTS, MTL_TYPE, textureType, type ExportChoice } from "./io/exports"
 import type { ExportOptions, ImportUnit, OpOutcome } from "./kernel/types";
 import { ImportReport, type Report } from "./components/ImportReport";
 import { NameDialog, type NameRequest } from "./components/NameDialog";
+import { parseAlong } from "./lib/extrudeAlong";
 import { SceneTabs } from "./components/SceneTabs";
 import { SheetsWorkspace } from "./sheets/SheetsWorkspace";
 import { ModeSwitch, type WorkMode } from "./sheets/SheetTabs";
@@ -1891,6 +1892,26 @@ export function App() {
     if (r?.outcome.kind === "object_created") select([{ kind: "object", object: r.outcome.object }]);
   }, [apply, select]);
 
+  /** sketchcraft E-30: Edit > Extrude Faces Along Axis: the selected faces, together, along
+   * blue (or a typed axis) into one solid; the faces stay. */
+  const extrudeAlong = useCallback(() => {
+    const faces = live.current.selection.flatMap((x) => (x.kind === "region" ? [[x.sketch, x.region] as [number, number]] : []));
+    if (!faces.length) return void setMessage({ text: "Select the faces to extrude (Shift+click adds one).", error: true });
+    setNameRequest({
+      title: "Extrude Faces Along Axis",
+      label: "Distance (blue; type red or green first for another axis)",
+      value: "",
+      ok: "Extrude",
+      onOk: (text) => {
+        const r = parseAlong(text, live.current.units);
+        if (!r.ok) return void setMessage({ text: r.error, error: true });
+        void apply({ op: "extrude_faces", faces, vector: r.vector }, () => `Extruded ${plural(faces.length, "face")} together into one solid.`).then((res) => {
+          if (res?.outcome.kind === "object_created") select([{ kind: "object", object: res.outcome.object }]);
+        });
+      },
+    });
+  }, [apply, select]);
+
   const explode = useCallback(
     async (nodes: number[]) => {
       if (!nodes.length) return void setMessage({ text: "Select a group or component to explode.", error: true });
@@ -2906,6 +2927,12 @@ export function App() {
           title: "sketchcraft: each selected solid becomes plain faces (its volume goes); then Select + Delete removes a face",
           disabled: !selection.some((x) => x.kind === "object"),
           onSelect: () => void explodeSolids(),
+        },
+        {
+          label: "Extrude Faces Along Axis…",
+          title: "sketchcraft: the selected faces extruded together along an axis (blue by default) into one solid, e.g. a roof slab",
+          disabled: !selection.some((x) => x.kind === "region"),
+          onSelect: extrudeAlong,
         },
         {
           label: "Make Solid from Faces",

@@ -301,3 +301,14 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 1 scénario, qui échouait avant (« On Green Axis ») et passe ; `cargo test --workspace` 751 réussis ; clippy et fmt propres. Niveau : testé (banc : 1 scénario). Non vérifié ici : à la souris (le WASM est à reconstruire chez JC).
 - Limites connues : il faut avoir survolé le coin pendant le tracé, comme dans SketchUp.
+
+## H-20261117-7 · évolution · module|interface · Extruder ensemble des faces le long d'un axe (E-30)
+
+- Origine : JC (17 nov. 2026, 08 h 13) : « il faudrait une fonction extruder ensemble sur l'axe ( ici je veux extruder l'ensemble de 30 cm sur l'axe vertical pour simuler la toiture, mais l'extrusion actuelle fonctionne uniquement sur la normale d'une face unique ) » ; 08 h 19 : « en fait il faut conserver les deux , c'est une autre façon de procéder » ; E-30.
+- Fichiers : `crates/kernel/src/model.rs` (op `ExtrudeFaces` ; `extrude_faces` ; `face_rings`, `weld_rings`, `solid_from_rings`, `not_a_volume` tirés de `solid_from_faces`, sans changer son comportement) ; `crates/kernel/tests/explode_solid.rs` (2 scénarios) ; `src/lib/extrudeAlong.ts` et son test (3) ; `src/kernel/types.ts` ; `src/App.tsx` (Édition > Extrude Faces Along Axis…).
+- Évolution : les faces choisies sont extrudées ensemble le long d'un vecteur en un seul volume : les faces, les faces déplacées, et un côté le long de chaque arête du pourtour (l'arête commune, comme le faîtage, n'en a pas). Les faces restent (elles servent encore à fermer la maison). Le Pousser/Tirer par la normale d'une face est inchangé : les deux façons coexistent.
+- Écarté : ôter les faces comme le fait l'extrusion d'une région (elles manqueraient ensuite pour refaire le volume de la maison).
+- Effet sur les résultats, les projets : aucun sur l'existant ; une op nouvelle dans le journal.
+- Confidentialité : non.
+- Vérification : noyau, 2 scénarios (deux pans → 0,6 m³ étanche, faces gardées ; direction dans le plan des faces → refus, rien de créé) ; interface, 3 tests de lecture de la valeur ; `cargo test --workspace` 753, vitest 1177 réussis ; clippy, fmt, `tsc -b`, `npm run build` propres. Niveau : testé (banc : 5 scénarios). Non vérifié ici : à la souris, le WASM (à construire chez JC).
+- Limites connues : des faces disjointes (qui ne se touchent pas) sont refusées (« more than one piece ») ; extrudez-les séparément. Pas encore d'aperçu pendant la saisie ni de sens donné à la souris.
