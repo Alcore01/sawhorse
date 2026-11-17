@@ -63,6 +63,8 @@ export type KernelOp =
   | { op: "union_solids"; objects: number[] }
   // sketchcraft E-40: an imported building mesh rebuilt as one solid from its roof.
   | { op: "unify_mesh"; mesh: number }
+  // sketchcraft E-41: faces of one solid nearly in one plane made one flat face.
+  | { op: "merge_faces"; object: number; faces: number[] }
   | { op: "delete_node"; node: number }
   | { op: "rename"; item: Item; name: string | null }
   | { op: "rename_definition"; definition: number; name: string }

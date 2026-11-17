@@ -16,7 +16,7 @@
 use glam::{DVec2, DVec3};
 use slotmap::SlotMap;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::{
     DocumentError, FaceEditError, KernelError, OffsetError, PushError, SketchError, TransformError,
@@ -344,6 +344,13 @@ pub enum Op {
     /// (and up or down the steps between roof parts), a flat floor. The mesh goes.
     UnifyMesh {
         mesh: u64,
+    },
+    /// sketchcraft E-41: faces of one solid, next to each other and nearly in one plane
+    /// (within 5 cm), made one flat face: their corners go onto the plane that fits them best
+    /// (straight up or down, unless the plane is upright), the edges between them go.
+    MergeFaces {
+        object: u64,
+        faces: Vec<u64>,
     },
     /// Delete a group or instance and everything in it.
     DeleteNode {
@@ -2478,6 +2485,7 @@ impl Model {
             Op::ExtrudeFaces { faces, vector } => self.extrude_faces(faces, *vector),
             Op::UnionSolids { objects } => self.union_solids(objects),
             Op::UnifyMesh { mesh } => self.unify_mesh(*mesh),
+            Op::MergeFaces { object, faces } => self.merge_faces(*object, faces),
             Op::DeleteNode { node } => self.delete_node(*node),
             Op::Rename { item, name } => self.rename(*item, name.as_deref()),
             Op::RenameDefinition { definition, name } => self.rename_definition(*definition, name),
@@ -4524,6 +4532,127 @@ impl Model {
         })
     }
 
+    /// sketchcraft E-41 (H-20261117-18): see [`Op::MergeFaces`].
+    fn merge_faces(&mut self, object: u64, faces: &[u64]) -> Result<OpOutcome, KernelError> {
+        let refuse = |m: &str| not_a_volume(&format!("these faces cannot be merged: {m}"));
+        let oid = self.object_key(object)?;
+        self.editable_object(oid)?;
+        let o = &self.objects[oid];
+        let mut p = o.brep().to_polys();
+        let sel: Vec<usize> = (0..p.faces.len())
+            .filter(|&i| p.faces[i].id.is_some_and(|id| faces.contains(&id)))
+            .collect();
+        if sel.len() < 2 {
+            return Err(refuse("select two faces of one solid or more"));
+        }
+        if sel.iter().any(|&i| !p.faces[i].holes.is_empty()) {
+            return Err(refuse("a face with a hole"));
+        }
+        let corners: BTreeSet<usize> = sel
+            .iter()
+            .flat_map(|&i| p.faces[i].outer.iter().copied())
+            .collect();
+        let pts: Vec<DVec3> = corners.iter().map(|&v| p.points[v]).collect();
+        let plane = Plane::fit(&pts).map_err(|_| refuse("their corners fit no plane"))?;
+        let off = pts
+            .iter()
+            .map(|&q| plane.signed_distance(q).abs())
+            .fold(0.0, f64::max);
+        if off > MERGE_TOLERANCE {
+            return Err(refuse(&format!(
+                "they are {:.0} cm out of one plane (at most {:.0} cm)",
+                off * 100.0,
+                MERGE_TOLERANCE * 100.0
+            )));
+        }
+        // Onto the plane: straight up or down when it is not upright (walls stay upright).
+        let n = plane.normal;
+        for &v in &corners {
+            let q = p.points[v];
+            let d = plane.signed_distance(q);
+            p.points[v] = if n.z.abs() > 0.1 {
+                q - DVec3::Z * (d / n.z)
+            } else {
+                q - n * d
+            };
+        }
+        // The merged outline: the selected faces' sides not shared within the selection.
+        let mut inner: BTreeSet<(usize, usize)> = BTreeSet::new();
+        let mut sides: Vec<(usize, usize)> = Vec::new();
+        for &i in &sel {
+            let r = &p.faces[i].outer;
+            for k in 0..r.len() {
+                sides.push((r[k], r[(k + 1) % r.len()]));
+            }
+        }
+        let set: BTreeSet<(usize, usize)> = sides.iter().copied().collect();
+        for &(a, b) in &sides {
+            if set.contains(&(b, a)) {
+                inner.insert((a, b));
+            }
+        }
+        let mut rim: Vec<(usize, usize)> =
+            sides.into_iter().filter(|e| !inner.contains(e)).collect();
+        if inner.is_empty() {
+            return Err(refuse("they do not touch along an edge"));
+        }
+        let mut loops: Vec<Vec<usize>> = Vec::new();
+        while let Some((a, b)) = rim.pop() {
+            let mut lp = vec![a];
+            let mut at = b;
+            while at != a {
+                let Some(k) = rim.iter().position(|e| e.0 == at) else {
+                    return Err(refuse("their outline does not close"));
+                };
+                lp.push(at);
+                at = rim.swap_remove(k).1;
+            }
+            loops.push(lp);
+        }
+        let area = |r: &[usize], pts: &[DVec3]| -> f64 {
+            let mut a = DVec3::ZERO;
+            for k in 0..r.len() {
+                a += pts[r[k]].cross(pts[r[(k + 1) % r.len()]]);
+            }
+            a.dot(n).abs() / 2.0
+        };
+        loops.sort_by(|x, y| area(y, &p.points).total_cmp(&area(x, &p.points)));
+        let outer = loops.remove(0);
+        let id = p.faces[sel[0]].id;
+        // Faces that kept a moved corner fit their plane afresh (and are refused if bent).
+        let moved: BTreeSet<usize> = corners;
+        for f in p.faces.iter_mut() {
+            if f.outer
+                .iter()
+                .chain(f.holes.iter().flatten())
+                .any(|v| moved.contains(v))
+            {
+                f.plane = None;
+            }
+        }
+        let mut merged = crate::brep::PolyFace::new(outer, loops);
+        merged.id = id;
+        let mut keep: Vec<crate::brep::PolyFace> = p
+            .faces
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !sel.contains(i))
+            .map(|(_, f)| f.clone())
+            .collect();
+        keep.push(merged);
+        p.faces = keep;
+        p.user_edges.clear();
+        let next = o.rebuilt(p).map_err(|e| refuse(&e.to_string()))?;
+        next.validate().map_err(|_| {
+            refuse("putting them in one plane would bend a face beside them (merge it too, or split it first)")
+        })?;
+        self.objects[oid] = next;
+        self.touch(oid);
+        Ok(OpOutcome::FacesMerged {
+            face: id.unwrap_or(0),
+        })
+    }
+
     /// sketchcraft E-40 (H-20261117-17): see [`Op::UnifyMesh`].
     fn unify_mesh(&mut self, mesh: u64) -> Result<OpOutcome, KernelError> {
         let k = from_public::<MeshId>(mesh);
@@ -5062,13 +5191,16 @@ fn face_groups(polys: &[Vec<Vec<usize>>]) -> Vec<Vec<usize>> {
 /// be sewn together (GeoHVAC's are 1 to 2 cm apart).
 pub const UNIFY_GAP: f64 = 0.03;
 
+/// sketchcraft E-41: how far (metres) faces may lie out of one plane and still be merged.
+pub const MERGE_TOLERANCE: f64 = 0.05;
+
 /// sketchcraft E-40 (H-20261117-17): a 2.5D building (walls upright, under a roof) rebuilt
 /// from an imported mesh's roof: its faces facing up or down by more than about 12° and
 /// above the floor band, welded within `gap` (and their corners brought to one plan
 /// position within `gap`), each outline edge of the roof gets a vertical wall: down to the
 /// floor, or, where another roof edge lies under or over it in plan (a step between two roof
 /// parts), up or down to that edge; the floor is flat at the walls' foot (the median height
-/// of the lowest half metre of points). The mesh's own walls and floor are not used.
+/// of the lowest half metre of points, or the ground, z = 0, for a roof alone). The mesh's own walls and floor are not used.
 fn unify_25d(
     positions: &[DVec3],
     faces: &[Vec<Vec<u32>>],
@@ -5086,7 +5218,8 @@ fn unify_25d(
         .filter(|&z| z <= zmin + 0.5)
         .collect();
     low.sort_by(f64::total_cmp);
-    let z0 = low[low.len() / 2];
+    // A roof alone (nothing near the ground): the floor is the ground, z = 0.
+    let z0 = if zmin > 0.5 { 0.0 } else { low[low.len() / 2] };
     // The roof faces (outer rings only).
     let mut roof_pts: Vec<DVec3> = Vec::new();
     let mut roof_rings: Vec<Vec<usize>> = Vec::new();

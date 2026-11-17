@@ -112,3 +112,73 @@ fn a_mesh_without_a_roof_is_refused_and_kept() {
     assert!(err.to_string().contains("no roof faces"), "{err}");
     assert_eq!(m.meshes().len(), 1);
 }
+
+/// A 4 x 4 m flat-roofed block whose roof is two triangles, one corner 2 cm high: unified,
+/// then (sketchcraft E-41) its two roof faces merged into one flat face.
+#[test]
+fn nearly_coplanar_roof_faces_merge_into_one_flat_face() {
+    let it = item(
+        vec![
+            [0.0, 0.0, 3.0],
+            [4.0, 0.0, 3.0],
+            [4.0, 4.0, 3.02],
+            [0.0, 4.0, 3.0],
+            [0.0, 0.0, 0.0],
+        ],
+        &[[0, 1, 2], [0, 2, 3]],
+    );
+    let mut m = imported(it);
+    let mesh = m.meshes()[0].0;
+    m.apply(&Op::UnifyMesh { mesh }).unwrap();
+    let (oid, o) = m.objects()[0];
+    let p = o.brep().to_polys();
+    let roof: Vec<u64> = (0..p.faces.len())
+        .filter(|&i| {
+            p.plane(i).is_some_and(|pl| pl.normal.z.abs() > 0.5)
+                && p.faces[i].outer.iter().all(|&v| p.points[v].z > 1.0)
+        })
+        .map(|i| p.faces[i].id.unwrap())
+        .collect();
+    assert_eq!(roof.len(), 2, "two roof triangles before");
+    let faces_before = m.stats().faces;
+    let out = m
+        .apply(&Op::MergeFaces {
+            object: oid,
+            faces: roof,
+        })
+        .unwrap();
+    assert!(matches!(out, OpOutcome::FacesMerged { .. }), "{out:?}");
+    assert_eq!(m.stats().faces, faces_before - 1);
+    assert!(m.stats().watertight);
+    let v = m.stats().volume_m3;
+    assert!((v - 16.0 * 3.005).abs() < 0.01, "{v}");
+}
+
+#[test]
+fn faces_far_out_of_one_plane_are_not_merged() {
+    // A box: its top and a side are at right angles, nothing changes.
+    let mut m = Model::with_ground_sketch();
+    m.apply(&Op::AddRectangle {
+        sketch: 1,
+        x: 0.0,
+        y: 0.0,
+        w: 1.0,
+        h: 1.0,
+    })
+    .unwrap();
+    m.apply(&Op::Extrude {
+        sketch: 1,
+        region: 1,
+        distance: 1.0,
+    })
+    .unwrap();
+    let h = m.hash();
+    let err = m
+        .apply(&Op::MergeFaces {
+            object: 1,
+            faces: vec![1, 2, 3],
+        })
+        .unwrap_err();
+    assert!(err.to_string().contains("out of one plane"), "{err}");
+    assert_eq!(m.hash(), h);
+}

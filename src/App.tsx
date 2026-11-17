@@ -1970,6 +1970,16 @@ export function App() {
     if (r?.outcome.kind === "object_created") select([{ kind: "object", object: r.outcome.object }]);
   }, [apply, select]);
 
+  /** sketchcraft E-41: Edit > Merge Faces: the selected faces of one solid, side by side and
+   * nearly in one plane (5 cm), made one flat face; the edges between them go. */
+  const mergeFaces = useCallback(async () => {
+    const faces = live.current.selection.flatMap((x) => (x.kind === "face" ? [x] : []));
+    const objects = [...new Set(faces.map((f) => f.object))];
+    if (faces.length < 2 || objects.length !== 1) return void setMessage({ text: "Select two faces of one solid or more, side by side (Shift+click adds one).", error: true });
+    const r = await apply({ op: "merge_faces", object: objects[0], faces: faces.map((f) => f.face) }, () => `Merged ${faces.length} faces into one.`);
+    if (r?.outcome.kind === "faces_merged") select([{ kind: "face", object: objects[0], face: r.outcome.face }]);
+  }, [apply, select]);
+
   /** sketchcraft E-40: Edit > Unify Imported Meshes: each imported mesh, one undo step
    * each, rebuilt as a solid from its roof; what each became, or why not, in a report. */
   const unifyMeshes = useCallback(async () => {
@@ -3076,6 +3086,12 @@ export function App() {
           onSelect: () => void apply({ op: "leave_context" }, (r) => `Closed it. Editing ${contextTrail(r.scene.state.graph)}.`),
         },
         {
+          label: "Merge Faces",
+          title: "sketchcraft: the selected faces of one solid, side by side and nearly in one plane (within 5 cm), made one flat face: the edges between them go",
+          disabled: selection.filter((x) => x.kind === "face").length < 2,
+          onSelect: () => void mergeFaces(),
+        },
+        {
           label: "Unify Imported Meshes",
           title: "sketchcraft: each imported building mesh that is not a solid (a GeoHVAC .dae) rebuilt as one solid from its roof: roof pieces sewn, upright walls, a flat floor",
           disabled: !st?.meshes?.length,
@@ -3176,7 +3192,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;
