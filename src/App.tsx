@@ -1465,7 +1465,8 @@ export function App() {
         () => kernelRef.current,
         () => engineRef.current,
         () => {
-          const g = gridSpec(live.current.units);
+          // sketchcraft E-26: snap to the grid level on screen.
+          const g = engineRef.current?.gridLevel?.() ?? gridSpec(live.current.units);
           return [g.minor, g.major];
         },
         memoryRef.current,

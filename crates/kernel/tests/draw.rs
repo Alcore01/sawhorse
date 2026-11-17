@@ -541,3 +541,112 @@ fn one_line_closing_two_loops_makes_both_faces() {
         .map(|(_, s)| s.region_count());
     assert_eq!(front, Some(1), "the front wall is a face too");
 }
+
+/// sketchcraft E-19 (H-20261117-3): a gable drawn line by line above an extruded box closes
+/// against the box's top edge (an edge of a solid, not of a sketch), as in SketchUp.
+#[test]
+fn a_stroke_closes_against_a_solids_edge() {
+    let mut m = run(&[
+        Op::AddRectangle {
+            sketch: 1,
+            x: 0.0,
+            y: 0.0,
+            w: 2.0,
+            h: 1.0,
+        },
+        Op::Extrude {
+            sketch: 1,
+            region: 1,
+            distance: 1.0,
+        },
+    ]);
+    // The front gable, upright on y = 0, from the box's top-front corners to a ridge point.
+    let out = m
+        .apply(&Op::Draw {
+            target: DrawTarget::Plane {
+                origin: [0.0, 0.0, 0.0],
+                normal: [0.0, 1.0, 0.0],
+            },
+            points: vec![[0.0, 0.0, 1.0], [1.0, 0.0, 2.0], [2.0, 0.0, 1.0]],
+            closed: false,
+            curve: None,
+        })
+        .unwrap();
+    assert!(
+        matches!(out, OpOutcome::Drawn { ref regions, .. } if regions.len() == 1),
+        "the gable is a face: {out:?}"
+    );
+    // The solid is untouched: still one closed solid of 2 m³.
+    assert!(m.stats().watertight);
+    assert!((m.stats().volume_m3 - 2.0).abs() < 1e-9);
+}
+
+#[test]
+fn a_stroke_closes_around_a_solids_corner() {
+    // sketchcraft E-25: the ends lie on two edges of the box meeting at its top-left
+    // corner; the closing goes through the corner, and the box face is not redrawn.
+    let mut m = run(&[
+        Op::AddRectangle {
+            sketch: 1,
+            x: 0.0,
+            y: 0.0,
+            w: 2.0,
+            h: 1.0,
+        },
+        Op::Extrude {
+            sketch: 1,
+            region: 1,
+            distance: 1.0,
+        },
+    ]);
+    let out = m
+        .apply(&Op::Draw {
+            target: DrawTarget::Plane {
+                origin: [0.0, 0.0, 0.0],
+                normal: [0.0, 1.0, 0.0],
+            },
+            points: vec![[0.0, 0.0, 0.5], [-0.5, 0.0, 1.5], [1.0, 0.0, 1.0]],
+            closed: false,
+            curve: None,
+        })
+        .unwrap();
+    assert!(
+        matches!(out, OpOutcome::Drawn { ref regions, .. } if regions.len() == 1),
+        "one face, not the box's: {out:?}"
+    );
+    assert!(m.stats().watertight);
+}
+
+#[test]
+fn a_stroke_away_from_solids_closes_nothing() {
+    // The solid's edges are not pulled in when the stroke does not end on them.
+    let mut m = run(&[
+        Op::AddRectangle {
+            sketch: 1,
+            x: 0.0,
+            y: 0.0,
+            w: 2.0,
+            h: 1.0,
+        },
+        Op::Extrude {
+            sketch: 1,
+            region: 1,
+            distance: 1.0,
+        },
+    ]);
+    let out = m
+        .apply(&Op::Draw {
+            target: DrawTarget::Plane {
+                origin: [0.0, 0.0, 0.0],
+                normal: [0.0, 1.0, 0.0],
+            },
+            points: vec![[3.0, 0.0, 0.0], [4.0, 0.0, 1.0], [5.0, 0.0, 0.0]],
+            closed: false,
+            curve: None,
+        })
+        .unwrap();
+    assert!(
+        matches!(out, OpOutcome::Drawn { ref regions, .. } if regions.is_empty()),
+        "{out:?}"
+    );
+}

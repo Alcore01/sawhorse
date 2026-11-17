@@ -250,3 +250,29 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 3 tests neufs (aire d'un rectangle de 2 × 3 m et d'un triangle ; faces + surface + groupe + solide déjà compté ; formats m² et pieds carrés), qui échouent sans le module ; suite complète : 1 168 passés (1 165 + 3), 2 ignorés, aucun échec. Niveau : testé ; essai par JC à faire.
 - Limites connues : le volume affiche les décimales du badge du modèle (jusqu'à 6) ; les maillages importés non solides n'ont pas de volume ; l'aire est celle de la face entière (ouvertures comprises si elles ne sont pas découpées).
+
+## H-20261117-3 · évolution · module · Jonction d'un tracé avec un solide (E-25)
+
+- Origine : JC (17 nov. 2026, 06 h 40) : « les jonctions nouvelle a la partie extrudée (le toit) ne se font pas » ; E-25.
+- Constat : la fermeture de E-19 (`draw_in_sketch_closing`, `close_on_other_planes`) ne lisait que les arêtes des esquisses ; les arêtes d'un volume extrudé n'existaient pas pour elle.
+- Fichiers : `crates/kernel/src/model.rs` (`solid_segments`, `solid_closers` ; appel dans les deux fermetures) ; `crates/kernel/tests/draw.rs` (3 scénarios).
+- Évolution : un tracé ouvert dont les deux extrémités sont sur des arêtes d'un solide du même contexte se ferme en face : par le morceau de l'arête entre les deux extrémités, ou par deux morceaux qui passent par un coin commun.
+- Écarté : prendre toutes les arêtes du solide dans le plan (premier essai) : le contour de la face du solide devenait une seconde face d'esquisse superposée (le test l'a montré : 2 régions au lieu d'une).
+- Effet sur les résultats : aucun sur les solides existants (étanchéité et volume vérifiés).
+- Effet sur les projets existants : aucun (pas de changement de format).
+- Confidentialité : non.
+- Vérification : 3 scénarios (pignon sur l'arête haute, fermeture par un coin, tracé loin du solide qui ne ferme rien) ; le premier échouait avant ; `cargo test --workspace` 746 réussis, clippy et fmt propres. Niveau : testé (banc : 3 scénarios). Non vérifié ici : le WASM (à construire chez JC) et l'essai à la souris.
+- Limites connues : une extrémité au milieu d'une face du solide (pas sur une arête) ne ferme rien ; plus de deux arêtes à suivre ne sont pas cherchées.
+
+## H-20261117-4 · évolution · interface · Grille adaptative et pivot d'orbite près du modèle (E-26, E-27)
+
+- Origine : JC (17 nov. 2026, 06 h 40) : « quand je click sur un point de l'horizon, il l'utilise comme référence pour le déplacement de l'orbite (ce qui n'est pas très pratique). la grille n'est pas adaptive en fonction de l'échelle » ; E-26, E-27.
+- Constat : la grille n'avait qu'un pas (celui des unités), masqué quand il devenait trop fin ; le sol sous le curseur était accepté comme pivot jusqu'à 50 fois la taille du modèle, donc presque jusqu'à l'horizon.
+- Fichiers : `src/viewport/camera.ts` (`gridLevel`, `GRID_MIN_MAJORS`, `groundPivotOk`) ; `src/viewport/engine.ts` (niveau courant, reconstruction au changement de niveau, `gridLevel()`, `gridState().level`, `navPick`) ; `src/App.tsx` (l'accrochage à la grille suit le niveau affiché) ; `src/viewport/grid-level.test.ts` (6 tests).
+- Évolution : la grille change de pas avec le zoom (×10 en métrique ; 1 in/1 ft puis 1 ft/10 ft… en impérial) et s'étend assez pour remplir la vue. L'orbite ne prend un point du sol comme pivot que près du modèle ou du point visé ; sinon elle tourne autour du point visé.
+- Écarté : supprimer le pivot au sol (un clic près d'un bâtiment sur le terrain reste utile).
+- Effet sur les résultats : aucun sur le modèle. `gridState().spec` reste la grille des unités (le test e2e qui lit son libellé est inchangé).
+- Effet sur les projets existants : aucun.
+- Confidentialité : non.
+- Vérification : 6 tests unitaires (niveaux métriques et impériaux, maille ≥ 6 px, pivot accepté près, refusé vers l'horizon) ; vitest 1174 réussis, `tsc -b` et `npm run build` propres. Niveau : testé (banc : 6 scénarios). Non vérifié ici : le rendu (pas de WebGL2 ici) et les e2e Playwright ; à essayer par JC.
+- Limites connues : changement de pas net, sans fondu entre niveaux. E-28 (supprimer une face d'un volume) n'est pas fait : le noyau garde les solides fermés ; voies à décider par JC : (a) « éclater » le volume en faces d'esquisse, puis supprimer la face (on perd le volume calculé) ; (b) supprimer la face et refermer aussitôt par les faces voisines prolongées (comme retirer un pan de toit) ; (c) remplacer la face par un tracé dessus (le toit sur le dessus de la boîte, E-25) et fusionner (E-04).

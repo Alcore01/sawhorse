@@ -4217,7 +4217,8 @@ impl Model {
             return Ok((sid, regions));
         }
         let parent = self.sketches[sid].parent;
-        let foreign = self.edges_on_plane(&plane, parent, &[sid]);
+        let mut foreign = self.edges_on_plane(&plane, parent, &[sid]);
+        foreign.extend(self.solid_closers(&plane, parent, pts));
         let mut s = self.sketches[sid].clone();
         let more = import_connected(&mut s, &plane, pts, &foreign);
         if !more.is_empty() {
@@ -4280,6 +4281,78 @@ impl Model {
         out
     }
 
+    /// sketchcraft E-25 (H-20261117-3): the pieces of the context's solid edges on
+    /// `plane` that close the stroke `pts` against the solid: the part of one edge between
+    /// the stroke's two ends, or the two parts meeting at a corner when each end lies on
+    /// one of two edges sharing it. Only these are taken, never a whole face outline (the
+    /// solid's face is already a face).
+    fn solid_closers(
+        &self,
+        plane: &Plane,
+        parent: Option<crate::ids::NodeId>,
+        pts: &[DVec3],
+    ) -> Vec<(DVec3, DVec3)> {
+        let (a, b) = (pts[0], pts[pts.len() - 1]);
+        if a.distance(b) <= PLANARITY {
+            return Vec::new();
+        }
+        let segs: Vec<(DVec3, DVec3)> = self
+            .solid_segments(parent)
+            .into_iter()
+            .filter(|(p, q)| {
+                plane.signed_distance(*p).abs() <= PLANARITY
+                    && plane.signed_distance(*q).abs() <= PLANARITY
+            })
+            .collect();
+        let on = |x: DVec3, (p, q): (DVec3, DVec3)| {
+            let d = q - p;
+            let t = ((x - p).dot(d) / d.length_squared()).clamp(0.0, 1.0);
+            (p + d * t).distance(x) <= PLANARITY
+        };
+        if segs.iter().any(|&sg| on(a, sg) && on(b, sg)) {
+            return vec![(a, b)];
+        }
+        for &s1 in segs.iter().filter(|&&sg| on(a, sg)) {
+            for &s2 in segs.iter().filter(|&&sg| on(b, sg)) {
+                for c in [s1.0, s1.1] {
+                    if (c.distance(s2.0) <= PLANARITY || c.distance(s2.1) <= PLANARITY)
+                        && c.distance(a) > PLANARITY
+                        && c.distance(b) > PLANARITY
+                    {
+                        return vec![(a, c), (c, b)];
+                    }
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    /// sketchcraft E-25 (H-20261117-3): every edge (world) of the solids directly in the
+    /// node `parent` (the open context), once per face loop side.
+    fn solid_segments(&self, parent: Option<crate::ids::NodeId>) -> Vec<(DVec3, DVec3)> {
+        let mut out = Vec::new();
+        for (_, o) in self.objects.iter() {
+            if o.membership().parent != parent {
+                continue;
+            }
+            let polys = o.brep().to_polys();
+            for f in &polys.faces {
+                for ring in std::iter::once(&f.outer).chain(f.holes.iter()) {
+                    for i in 0..ring.len() {
+                        let (a, b) = (
+                            polys.points[ring[i]],
+                            polys.points[ring[(i + 1) % ring.len()]],
+                        );
+                        if a.distance(b) > PLANARITY {
+                            out.push((a, b));
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
     /// sketchcraft E-19: a straight stroke: the planes through it and an edge of another
     /// sketch touching one of its ends, in turn; on each where it closes a loop (with the
     /// edges there connected to it), it is drawn into that plane's sketch (made if need
@@ -4320,6 +4393,11 @@ impl Model {
                 }
             }
         }
+        touching.extend(self.solid_segments(parent).into_iter().filter(|(p, q)| {
+            [a, b]
+                .iter()
+                .any(|e| e.distance(*p) <= PLANARITY || e.distance(*q) <= PLANARITY)
+        }));
         for (p, q) in touching {
             let n = d.cross(q - p);
             if n.length() <= 1e-9 * (q - p).length().max(1e-12) {
@@ -4356,6 +4434,7 @@ impl Model {
             let mut skip = vec![sid];
             skip.extend(existing);
             let mut foreign = self.edges_on_plane(&tp, parent, &skip);
+            foreign.extend(self.solid_closers(&tp, parent, pts));
             // The sketch the stroke was drawn into, without the stroke.
             let bp = *before.plane();
             for (_, [va, vb]) in before.edges() {

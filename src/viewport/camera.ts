@@ -117,6 +117,45 @@ export function gridVisibility(minorPx: number, ratio: number): { minor: boolean
   return { minor, major: majorPx >= GRID_MIN_PX, opacity };
 }
 
+/** sketchcraft E-26 (H-20261117-4): the grid level for the zoom: the units' grid (`base`)
+ * stepped up (metric ×10: 10 mm/100 mm, 100 mm/1 m, 1 m/10 m…; imperial 1 in/1 ft, then
+ * 1 ft/10 ft, 10 ft/100 ft…) until a minor cell spans at least GRID_MIN_PX pixels at
+ * `metresPerPixel`. `base` itself when it already does. */
+export function gridLevel(base: GridSpec, metresPerPixel: number): GridSpec {
+  const mpp = Math.max(metresPerPixel, 1e-12);
+  let level = base;
+  for (let i = 0; i < 12 && level.minor / mpp < GRID_MIN_PX; i++) {
+    const minor = level.major;
+    const major = minor * 10;
+    level = { minor, major, ratio: 10, label: `${gridLabel(minor, base)} / ${gridLabel(major, base)}` };
+  }
+  return level;
+}
+
+function gridLabel(m: number, base: GridSpec): string {
+  const round = (v: number) => String(Math.round(v * 1000) / 1000);
+  if (base.ratio === 12) {
+    const ft = m / (12 * M_PER_IN);
+    return ft < 1 ? `${round(ft * 12)} in` : `${round(ft)} ft`;
+  }
+  if (m < 1 - 1e-9) return `${round(m * 1000)} mm`;
+  if (m < 1000 - 1e-6) return `${round(m)} m`;
+  return `${round(m / 1000)} km`;
+}
+
+/** Major cells the grid reaches at least, each way from the origin, at a coarser level
+ * (so the grid still fills the view when zoomed out to that level). */
+export const GRID_MIN_MAJORS = 60;
+
+/** sketchcraft E-27 (H-20261117-4): whether a ground point under the cursor may be an
+ * orbit's pivot: only near the model or the look-at point (within the model's size or what
+ * the view spans), never far off toward the horizon, where the cursor ray grazes the
+ * ground. Else the orbit turns about the look-at point. */
+export function groundPivotOk(ground: Vec3, target: Vec3, contentRadius: number, viewSpan: number): boolean {
+  const d = Math.hypot(ground[0] - target[0], ground[1] - target[1], ground[2] - target[2]);
+  return d <= Math.max(2 * contentRadius, viewSpan);
+}
+
 /**
  * Half-size of the square grid, metres: at least 8 ft (or 2.5 m), and at least twice the
  * model's extent, rounded up to whole major cells.

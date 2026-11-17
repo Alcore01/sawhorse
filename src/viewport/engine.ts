@@ -34,6 +34,9 @@ import {
   gridHalfExtent,
   gridLines,
   gridSpec,
+  gridLevel,
+  GRID_MIN_MAJORS,
+  groundPivotOk,
   gridVisibility,
   projectionForView,
   type GridSpec,
@@ -252,6 +255,8 @@ export class ViewportEngine {
   private view: ViewId | null = "iso";
   private projection: Projection = "parallel";
   private spec: GridSpec = gridSpec("frac-in");
+  /** sketchcraft E-26: the level drawn for the zoom (`spec` stepped up). */
+  private level: GridSpec = this.spec;
   private gridHalf = 0;
   /** Half-height of the ortho frustum at zoom 1, metres. */
   private frame = 1;
@@ -368,6 +373,7 @@ export class ViewportEngine {
     const spec = gridSpec(units);
     if (spec.minor === this.spec.minor && this.gridMinor) return;
     this.spec = spec;
+    this.level = gridLevel(spec, this.gridMinor ? this.pixelAtTarget() : 0);
     this.rebuildGrid();
     this.requestRender();
   }
@@ -376,12 +382,17 @@ export class ViewportEngine {
     return this.spec;
   }
 
+  /** sketchcraft E-26: the grid level drawn now. */
+  gridLevel(): GridSpec {
+    return this.level;
+  }
+
   private rebuildGrid(): void {
     disposeObject(this.gridMinor);
     disposeObject(this.gridMajor);
     const box = this.contentBox();
     const r = box.getBoundingSphere(new THREE.Sphere()).radius + box.getCenter(new THREE.Vector3()).length();
-    this.gridHalf = gridHalfExtent(this.spec, r);
+    this.gridHalf = Math.max(gridHalfExtent(this.level, r), this.level === this.spec ? 0 : GRID_MIN_MAJORS * this.level.major);
     const mk = (pts: Float32Array, color: string, order: number) => {
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.BufferAttribute(pts, 3));
@@ -393,8 +404,8 @@ export class ViewportEngine {
       return l;
     };
     const tones = gridTones(this.style.background, this.theme);
-    this.gridMinor = mk(gridLines(this.spec.minor, this.gridHalf, this.spec.ratio), tones.minor, -2);
-    this.gridMajor = mk(gridLines(this.spec.major, this.gridHalf), tones.major, -1);
+    this.gridMinor = mk(gridLines(this.level.minor, this.gridHalf, this.level.ratio), tones.minor, -2);
+    this.gridMajor = mk(gridLines(this.level.major, this.gridHalf), tones.major, -1);
     (this.gridMajor.material as THREE.LineBasicMaterial).opacity = 0.55;
     this.scene.add(this.gridMinor, this.gridMajor);
     this.updateGridVisibility();
@@ -433,8 +444,16 @@ export class ViewportEngine {
 
   private updateGridVisibility(): void {
     if (!this.gridMinor || !this.gridMajor) return;
-    const minorPx = this.spec.minor / Math.max(this.pixelAtTarget(), 1e-9);
-    const vis = gridVisibility(minorPx, this.spec.ratio);
+    // sketchcraft E-26: the grid steps to the level that suits the zoom.
+    const level = gridLevel(this.spec, this.pixelAtTarget());
+    if (level.minor !== this.level.minor) {
+      this.level = level;
+      this.rebuildGrid();
+      this.buildAxes();
+      return;
+    }
+    const minorPx = this.level.minor / Math.max(this.pixelAtTarget(), 1e-9);
+    const vis = gridVisibility(minorPx, this.level.ratio);
     // Lane 21 (issue #4): View > Grid off hides both levels (the style's `grid`).
     const on = this.style.grid;
     this.gridMinor.visible = on && vis.minor;
@@ -443,8 +462,8 @@ export class ViewportEngine {
   }
 
   /** Which grid levels show right now, and whether the style shows the grid at all (tests and the HUD). */
-  gridState(): { minor: boolean; major: boolean; spec: GridSpec; enabled: boolean } {
-    return { minor: !!this.gridMinor?.visible, major: !!this.gridMajor?.visible, spec: this.spec, enabled: this.style.grid };
+  gridState(): { minor: boolean; major: boolean; spec: GridSpec; level: GridSpec; enabled: boolean } {
+    return { minor: !!this.gridMinor?.visible, major: !!this.gridMajor?.visible, spec: this.spec, level: this.level, enabled: this.style.grid };
   }
 
   // ---- theme -------------------------------------------------------------------------------
@@ -680,7 +699,7 @@ export class ViewportEngine {
     // The grid grows with the model.
     const box = this.contentBox();
     const r = box.getBoundingSphere(new THREE.Sphere()).radius + box.getCenter(new THREE.Vector3()).length();
-    if (gridHalfExtent(this.spec, r) > this.gridHalf) {
+    if (gridHalfExtent(this.level, r) > this.gridHalf) {
       this.rebuildGrid();
       this.buildAxes();
     }
@@ -1821,8 +1840,13 @@ varying float vOwnerState;`,
     const ground = ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), new THREE.Vector3());
     if (ground) {
       const span = this.pixelAtTarget() * Math.max(this.size.w, this.size.h);
-      const reach = 50 * Math.max(this.contentBox().getBoundingSphere(new THREE.Sphere()).radius, span);
-      if (ground.distanceTo(this.controls.target) <= reach) return [ground.x, ground.y, ground.z];
+      const radius = this.contentBox().getBoundingSphere(new THREE.Sphere()).radius;
+      const t = this.controls.target;
+      const g: Vec3 = [ground.x, ground.y, ground.z];
+      // sketchcraft E-27: the orbit pivot (snap) never goes off toward the horizon; a pan
+      // or zoom keeps the wider reach (it holds the point under the cursor).
+      const ok = snap ? groundPivotOk(g, [t.x, t.y, t.z], radius, span) : ground.distanceTo(t) <= 50 * Math.max(radius, span);
+      if (ok) return g;
     }
     return null;
   }
