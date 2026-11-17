@@ -363,3 +363,11 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non (rien ne quitte la tablette).
 - Vérification : `cap add android` réussi ici ; syntaxe du script vérifiée (`bash -n`) ; vitest 1181 réussis, `tsc -b` et build propres. Non vérifié : la construction Gradle et l'APK (kit Android injoignable ici), l'installation et l'usage sur la tablette ; à faire par JC.
 - Limites connues : APK de débogage (signé avec la clé de débogage : installation manuelle, pas pour le Play Store) ; ouvrir et enregistrer des fichiers sur Android reste à éprouver.
+
+## H-20261117-13 · correction · documentation · build-apk.sh : Gradle sous Java 21 (E-35)
+
+- Origine : JC (17 nov. 2026, 13 h 25), sortie du script : « BUG! exception in phase 'semantic analysis' … Unsupported class file major version 69 » ; E-35.
+- Constat : la version 69 est Java 25, celui fourni avec Android Studio (`~/android-studio/jbr`), mis en tête du PATH sur ma consigne de 12 h 26. Gradle 8.14.3 (celui du projet Capacitor) ne tourne qu'avec Java 21 à 24. Le script acceptait tout Java ≥ 21. Ma consigne de se passer d'`openjdk-21-jdk` était fausse.
+- Fichiers : `scripts/sketchcraft/build-apk.sh` (cherche un Java 21 à 24 : `JAVA_HOME`, `/usr/lib/jvm/*21*`, 22 à 24, le Java d'Android Studio, celui du PATH ; le donne à Gradle par `JAVA_HOME` ; sinon dit d'installer `openjdk-21-jdk`) ; `scripts/sketchcraft/LISEZMOI.md`.
+- Écarté : passer à Gradle 9 (accepte Java 25) : le greffon Android du projet (AGP 8.13) n'y est pas prévu.
+- Vérification : `bash -n` ; la recherche du Java, jouée ici, trouve `/usr/lib/jvm/java-21-openjdk-amd64` (version 21). Non vérifié : la construction complète chez JC.

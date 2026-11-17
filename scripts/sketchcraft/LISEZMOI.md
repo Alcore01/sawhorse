@@ -40,7 +40,7 @@ fichier obtenu est le même pour les deux systèmes. Donc :
 L'application Android emporte VolumeCraft entier : tout tourne sur la tablette, sans réseau
 ni hébergement. Elle se construit sur la machine Linux, une fois installés :
 
-- Java 21 : `sudo apt install openjdk-21-jdk` ;
+- Java 21 : `sudo apt install openjdk-21-jdk` (le Java 25 fourni avec Android Studio est trop récent pour Gradle) ;
 - le kit Android : installer Android Studio (developer.android.com/studio) et l'ouvrir une
   fois (il met le kit dans `~/Android/Sdk`).
 
