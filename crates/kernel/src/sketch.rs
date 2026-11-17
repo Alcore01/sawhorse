@@ -667,7 +667,7 @@ pub(crate) fn line_intersection(a: DVec2, b: DVec2, c: DVec2, d: DVec2) -> DVec2
 }
 
 /// True when `p` is strictly inside the rings (outer, minus holes).
-fn inside_rings(p: DVec2, outer: &[DVec2], holes: &[Vec<DVec2>]) -> bool {
+pub(crate) fn inside_rings(p: DVec2, outer: &[DVec2], holes: &[Vec<DVec2>]) -> bool {
     point_in_ring(p, outer) && !holes.iter().any(|h| point_in_ring(p, h))
 }
 

@@ -55,6 +55,9 @@ export type KernelOp =
   | { op: "make_component"; items: Item[]; name: string }
   | { op: "make_unique"; node: number }
   | { op: "explode"; node: number }
+  // sketchcraft E-28: a solid into plain faces; closed faces into a solid.
+  | { op: "explode_solid"; object: number }
+  | { op: "solid_from_faces"; faces: [number, number][] }
   | { op: "delete_node"; node: number }
   | { op: "rename"; item: Item; name: string | null }
   | { op: "rename_definition"; definition: number; name: string }
@@ -353,6 +356,7 @@ export type OpOutcome =
   | { kind: "component_created"; instance: number; definition: number }
   | { kind: "made_unique"; definition: number }
   | { kind: "exploded"; objects: number[]; nodes: number[] }
+  | { kind: "solid_exploded"; face_count: number }
   | { kind: "node_deleted" }
   | { kind: "visibility_set" }
   | { kind: "lock_set" }

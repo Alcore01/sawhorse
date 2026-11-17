@@ -315,6 +315,17 @@ pub enum Op {
     Explode {
         node: u64,
     },
+    /// sketchcraft E-28: a solid becomes plain faces: each face a region of the sketch on
+    /// its plane in the open context; the solid (and its volume) goes. A face can then be
+    /// erased like any region.
+    ExplodeSolid {
+        object: u64,
+    },
+    /// sketchcraft E-28: faces (`[sketch, region]` pairs) that close a volume become one
+    /// solid; the regions are used up as an extrusion uses its region.
+    SolidFromFaces {
+        faces: Vec<[u64; 2]>,
+    },
     /// Delete a group or instance and everything in it.
     DeleteNode {
         node: u64,
@@ -976,6 +987,10 @@ pub enum OpOutcome {
     Exploded {
         objects: Vec<u64>,
         nodes: Vec<u64>,
+    },
+    /// sketchcraft E-28: a solid became `face_count` plain faces.
+    SolidExploded {
+        face_count: u64,
     },
     NodeDeleted,
     VisibilitySet,
@@ -2434,6 +2449,8 @@ impl Model {
             Op::MakeComponent { items, name } => self.make_component(items, name),
             Op::MakeUnique { node } => self.make_unique(*node),
             Op::Explode { node } => self.explode(*node),
+            Op::ExplodeSolid { object } => self.explode_solid(*object),
+            Op::SolidFromFaces { faces } => self.solid_from_faces(faces),
             Op::DeleteNode { node } => self.delete_node(*node),
             Op::Rename { item, name } => self.rename(*item, name.as_deref()),
             Op::RenameDefinition { definition, name } => self.rename_definition(*definition, name),
@@ -4327,6 +4344,235 @@ impl Model {
         Vec::new()
     }
 
+    /// sketchcraft E-28 (H-20261117-5): see [`Op::ExplodeSolid`].
+    fn explode_solid(&mut self, object: u64) -> Result<OpOutcome, KernelError> {
+        let k = from_public::<ObjectId>(object);
+        if !self.objects.contains_key(k) {
+            return Err(DocumentError::NoSuchObject(object).into());
+        }
+        self.editable_object(k)?;
+        let polys = self.objects[k].brep().to_polys();
+        let mut faces = 0u64;
+        for f in &polys.faces {
+            let world: Vec<Vec<DVec3>> = f
+                .rings()
+                .map(|r| r.iter().map(|&i| polys.points[i]).collect())
+                .collect();
+            let plane = match f.plane {
+                Some(p) => p,
+                None => {
+                    let Some(n) = newell(&world[0]) else { continue };
+                    let Ok(p) = Plane::new(world[0][0], n) else {
+                        continue;
+                    };
+                    p
+                }
+            };
+            let sid = self.sketch_on(&plane);
+            let sp = *self.sketches[sid].plane();
+            let local: Vec<Vec<DVec2>> = world
+                .iter()
+                .map(|r| r.iter().map(|&p| sp.to_local(p)).collect())
+                .collect();
+            let before: Vec<RegionId> = self.sketches[sid].all_regions().map(|(r, _)| r).collect();
+            // The face's rings drawn, and what is inside the outer ring and outside the
+            // holes live again (a footprint this very solid used up comes back).
+            self.sketches[sid].release_footprint(&local)?;
+            // A hole stays a hole: a region new inside one is used up (not a face).
+            let s = &self.sketches[sid];
+            let in_holes: Vec<RegionId> = s
+                .regions()
+                .filter(|(r, reg)| {
+                    !before.contains(r)
+                        && local[1..]
+                            .iter()
+                            .any(|h| crate::sketch::inside_rings(reg.anchor, h, &[]))
+                })
+                .map(|(r, _)| r)
+                .collect();
+            for r in in_holes {
+                self.sketches[sid].consume_region(r)?;
+            }
+            faces += 1;
+        }
+        let removed = self.objects.remove(k).expect("checked");
+        self.object_order.retain(|&o| o != k);
+        self.mark(removed.member.parent);
+        Ok(OpOutcome::SolidExploded { face_count: faces })
+    }
+
+    /// sketchcraft E-28 (H-20261117-5): see [`Op::SolidFromFaces`].
+    fn solid_from_faces(&mut self, faces: &[[u64; 2]]) -> Result<OpOutcome, KernelError> {
+        let refuse = |m: &str| -> KernelError { DocumentError::NotAVolume(m.into()).into() };
+        if faces.len() < 4 {
+            return Err(refuse(
+                "a volume needs at least 4 faces: select the faces that close it",
+            ));
+        }
+        // The rings of each face in world space, outer first.
+        let mut rings_of: Vec<Vec<Vec<DVec3>>> = Vec::new();
+        let mut used: Vec<(SketchId, RegionId)> = Vec::new();
+        for &[sk, rg] in faces {
+            let sid = self.sketch_edit_key(sk)?;
+            let rid = from_public::<RegionId>(rg);
+            let s = &self.sketches[sid];
+            let r = s.region(rid).ok_or(SketchError::NoSuchRegion(rg))?;
+            if r.consumed {
+                return Err(SketchError::RegionConsumed(rg).into());
+            }
+            if used.contains(&(sid, rid)) {
+                continue;
+            }
+            let sp = *s.plane();
+            let (o, h) = s.region_rings(r);
+            let w = |ring: &Vec<DVec2>| ring.iter().map(|&p| sp.to_world(p)).collect::<Vec<_>>();
+            rings_of.push(std::iter::once(&o).chain(h.iter()).map(w).collect());
+            used.push((sid, rid));
+        }
+        // Weld the corners, then split each side at the corners lying on it (T-junctions).
+        let mut points: Vec<DVec3> = Vec::new();
+        let index = |p: DVec3, points: &mut Vec<DVec3>| -> usize {
+            if let Some(i) = points.iter().position(|q| q.distance(p) <= PLANARITY) {
+                return i;
+            }
+            points.push(p);
+            points.len() - 1
+        };
+        let idx: Vec<Vec<Vec<usize>>> = rings_of
+            .iter()
+            .map(|f| {
+                f.iter()
+                    .map(|r| r.iter().map(|&p| index(p, &mut points)).collect())
+                    .collect()
+            })
+            .collect();
+        let split = |ring: &Vec<usize>| -> Vec<usize> {
+            let mut out = Vec::new();
+            for i in 0..ring.len() {
+                let (a, b) = (ring[i], ring[(i + 1) % ring.len()]);
+                out.push(a);
+                let (pa, d) = (points[a], points[b] - points[a]);
+                let mut on: Vec<(f64, usize)> = (0..points.len())
+                    .filter(|&j| j != a && j != b)
+                    .filter_map(|j| {
+                        let t = (points[j] - pa).dot(d) / d.length_squared();
+                        (t > 0.0 && t < 1.0 && (pa + d * t).distance(points[j]) <= PLANARITY)
+                            .then_some((t, j))
+                    })
+                    .collect();
+                on.sort_by(|x, y| x.0.total_cmp(&y.0));
+                out.extend(on.into_iter().map(|(_, j)| j));
+            }
+            out
+        };
+        let mut polys: Vec<Vec<Vec<usize>>> =
+            idx.iter().map(|f| f.iter().map(&split).collect()).collect();
+        // Every side shared by exactly two faces, run once each way (turn faces to agree).
+        let mut uses: BTreeMap<(usize, usize), Vec<usize>> = BTreeMap::new();
+        for (fi, f) in polys.iter().enumerate() {
+            for r in f {
+                for i in 0..r.len() {
+                    let (a, b) = (r[i], r[(i + 1) % r.len()]);
+                    uses.entry((a.min(b), a.max(b))).or_default().push(fi);
+                }
+            }
+        }
+        if uses.values().any(|v| v.len() != 2) {
+            return Err(refuse(
+                "these faces do not close a volume: every edge must join exactly two of them",
+            ));
+        }
+        let dir = |f: &Vec<Vec<usize>>, a: usize, b: usize| -> bool {
+            f.iter()
+                .any(|r| (0..r.len()).any(|i| r[i] == a && r[(i + 1) % r.len()] == b))
+        };
+        let mut flip: Vec<Option<bool>> = vec![None; polys.len()];
+        let mut stack = vec![0usize];
+        flip[0] = Some(false);
+        while let Some(fi) = stack.pop() {
+            for (&(a, b), v) in &uses {
+                if !v.contains(&fi) {
+                    continue;
+                }
+                let other = if v[0] == fi { v[1] } else { v[0] };
+                if other == fi {
+                    return Err(refuse("a face meets itself along an edge"));
+                }
+                let mine = dir(&polys[fi], a, b) != flip[fi].unwrap();
+                let theirs = dir(&polys[other], a, b);
+                let want = mine == theirs; // same way: the other must turn
+                match flip[other] {
+                    None => {
+                        flip[other] = Some(want);
+                        stack.push(other);
+                    }
+                    Some(f) if f != want => {
+                        return Err(refuse(
+                            "these faces cannot all face outward (a twisted shell)",
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if flip.iter().any(Option::is_none) {
+            return Err(refuse(
+                "these faces make more than one piece: select one closed volume",
+            ));
+        }
+        for (f, fl) in polys.iter_mut().zip(&flip) {
+            if fl.unwrap() {
+                for r in f.iter_mut() {
+                    r.reverse();
+                }
+            }
+        }
+        let volume: f64 = polys
+            .iter()
+            .flatten()
+            .map(|r| {
+                (1..r.len().saturating_sub(1))
+                    .map(|i| points[r[0]].dot(points[r[i]].cross(points[r[i + 1]])))
+                    .sum::<f64>()
+            })
+            .sum::<f64>()
+            / 6.0;
+        if volume.abs() <= PLANARITY {
+            return Err(refuse("these faces enclose no volume"));
+        }
+        if volume < 0.0 {
+            for r in polys.iter_mut().flatten() {
+                r.reverse();
+            }
+        }
+        let pfaces: Vec<crate::brep::PolyFace> = polys
+            .into_iter()
+            .map(|mut f| {
+                let outer = f.remove(0);
+                crate::brep::PolyFace::new(outer, f)
+            })
+            .collect();
+        let brep = crate::brep::Brep::build(&crate::brep::Polys {
+            points,
+            faces: pfaces,
+            user_edges: Default::default(),
+        })
+        .map_err(|e| refuse(&format!("these faces do not make a solid: {e}")))?;
+        let mut obj = Object::from_brep(brep);
+        if !obj.watertight || obj.validate().is_err() {
+            return Err(refuse("these faces do not make a closed solid"));
+        }
+        obj.member.parent = self.context;
+        for &(sid, rid) in &used {
+            self.sketches[sid].consume_region(rid)?;
+        }
+        let id = self.insert_object(obj);
+        self.mark(self.context);
+        Ok(OpOutcome::ObjectCreated {
+            object: to_public(id),
+        })
+    }
+
     /// sketchcraft E-25 (H-20261117-3): every edge (world) of the solids directly in the
     /// node `parent` (the open context), once per face loop side.
     fn solid_segments(&self, parent: Option<crate::ids::NodeId>) -> Vec<(DVec3, DVec3)> {
@@ -4651,6 +4897,20 @@ fn straight(pts: &[DVec3]) -> bool {
 /// sketchcraft E-19: into `s` (on `plane`), the `foreign` edges connected to the stroke
 /// `pts` (through shared ends, edge after edge), kept only when they close a loop: the
 /// regions their insertion bounds; `s` is left as it was when there are none.
+/// sketchcraft E-28: the normal of a planar ring (Newell), if it has an area.
+fn newell(ring: &[DVec3]) -> Option<DVec3> {
+    let mut n = DVec3::ZERO;
+    for i in 0..ring.len() {
+        let (a, b) = (ring[i], ring[(i + 1) % ring.len()]);
+        n += DVec3::new(
+            (a.y - b.y) * (a.z + b.z),
+            (a.z - b.z) * (a.x + b.x),
+            (a.x - b.x) * (a.y + b.y),
+        );
+    }
+    (n.length() > 1e-12).then(|| n.normalize())
+}
+
 fn import_connected(
     s: &mut Sketch,
     plane: &Plane,

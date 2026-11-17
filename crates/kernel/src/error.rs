@@ -268,6 +268,9 @@ pub enum DocumentError {
     NoSuchMaterial(String),
     #[error("the file cannot be opened: {0}")]
     BadSnapshot(String),
+    /// sketchcraft E-28: the faces chosen do not close a volume (nothing changed).
+    #[error("{0}")]
+    NotAVolume(String),
     /// Lane 15: soft, smooth and hidden edges.
     #[error("{0}")]
     EdgeFlags(String),

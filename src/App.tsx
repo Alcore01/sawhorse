@@ -1865,6 +1865,32 @@ export function App() {
     [apply, inContext, parentOfItem, select],
   );
 
+  /** sketchcraft E-28: Edit > Explode Solid into Faces: each selected solid becomes plain
+   * faces (its volume goes); a face then goes with Select + Delete. One undo step. */
+  const explodeSolids = useCallback(async () => {
+    const objects = live.current.selection.flatMap((x) => (x.kind === "object" ? [x.object] : []));
+    if (!objects.length) return void setMessage({ text: "Select a solid to explode into faces.", error: true });
+    const ops: KernelOp[] = objects.map((object) => ({ op: "explode_solid", object }));
+    const r = await apply(ops.length === 1 ? ops[0] : { op: "batch", ops }, (r) => {
+      const outs = r.outcome.kind === "batch" ? r.outcome.outcomes : [r.outcome];
+      const n = outs.reduce((a, o) => a + (o.kind === "solid_exploded" ? o.face_count : 0), 0);
+      return `Exploded into ${plural(n, "face")}: select one and press Delete to remove it; Edit > Make Solid from Faces closes them again.`;
+    });
+    if (r) {
+      live.current.selection = [];
+      setSelection([]);
+    }
+  }, [apply]);
+
+  /** sketchcraft E-28: Edit > Make Solid from Faces: the selected faces, closing a volume,
+   * become one solid. */
+  const solidFromFaces = useCallback(async () => {
+    const faces = live.current.selection.flatMap((x) => (x.kind === "region" ? [[x.sketch, x.region] as [number, number]] : []));
+    if (faces.length < 4) return void setMessage({ text: "Select the faces that close a volume (at least 4; Shift+click adds one).", error: true });
+    const r = await apply({ op: "solid_from_faces", faces }, () => `Made a solid from ${plural(faces.length, "face")}.`);
+    if (r?.outcome.kind === "object_created") select([{ kind: "object", object: r.outcome.object }]);
+  }, [apply, select]);
+
   const explode = useCallback(
     async (nodes: number[]) => {
       if (!nodes.length) return void setMessage({ text: "Select a group or component to explode.", error: true });
@@ -2875,6 +2901,18 @@ export function App() {
           onSelect: () => selection[0]?.kind === "node" && void apply({ op: "make_unique", node: selection[0].node }, () => "Made unique: this copy has its own definition now."),
         },
         { label: "Explode", keys: "Ctrl+Shift+G", disabled: !selection.some((x) => x.kind === "node"), onSelect: () => void explode(selection.flatMap((x) => (x.kind === "node" ? [x.node] : []))) },
+        {
+          label: "Explode Solid into Faces",
+          title: "sketchcraft: each selected solid becomes plain faces (its volume goes); then Select + Delete removes a face",
+          disabled: !selection.some((x) => x.kind === "object"),
+          onSelect: () => void explodeSolids(),
+        },
+        {
+          label: "Make Solid from Faces",
+          title: "sketchcraft: the selected faces, if they close a volume, become one solid",
+          disabled: selection.filter((x) => x.kind === "region").length < 4,
+          onSelect: () => void solidFromFaces(),
+        },
         {
           label: "Explode Curve",
           title: "The selected circles, arcs, polygons and curves become plain edges, each segment its own again; one undo step",
