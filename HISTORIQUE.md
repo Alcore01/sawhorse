@@ -312,3 +312,14 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : noyau, 2 scénarios (deux pans → 0,6 m³ étanche, faces gardées ; direction dans le plan des faces → refus, rien de créé) ; interface, 3 tests de lecture de la valeur ; `cargo test --workspace` 753, vitest 1177 réussis ; clippy, fmt, `tsc -b`, `npm run build` propres. Niveau : testé (banc : 5 scénarios). Non vérifié ici : à la souris, le WASM (à construire chez JC).
 - Limites connues : des faces disjointes (qui ne se touchent pas) sont refusées (« more than one piece ») ; extrudez-les séparément. Pas encore d'aperçu pendant la saisie ni de sens donné à la souris.
+
+## H-20261117-8 · évolution · interface · Outil « Push ax. » : pousser ensemble le long d'un axe (E-31)
+
+- Origine : JC (17 nov. 2026, 09 h 01) : « ca ne va pas comme ca , il faut rajouter un bouton pour ce push sous l'autre et ajouter aussi la contrainte de l'axe directement dans la fenêtre avec le méme principe que l'accrochage classique » ; E-31 (suite de E-30).
+- Fichiers : `src/tools/pushaxis.ts` (outil) et `src/tools/pushaxis.test.ts` (3 tests) ; `src/lib/tools.ts` (entrée sous Push, sans touche) ; `src/components/glyphs.tsx` (icône) ; `src/App.tsx` (outil enregistré) ; `src/App.test.tsx` (20 outils).
+- Évolution : un appui sur une face d'esquisse puis un mouvement : cette face, ou toutes les faces sélectionnées si elle en fait partie, montent ensemble le long du bleu, avec l'aperçu des contours et la distance en direct. L'axe est une ligne d'inférence verrouillée : le curseur s'accroche aux points du modèle projetés dessus (comme Push/Pull le long de la normale). Flèches : droite rouge, gauche vert, haut bleu ; bas ou Maj : la parallèle ou perpendiculaire montrée. Glisser-lâcher, clic-bouger-clic, ou valeur tapée. L'op est celle de E-30 (`extrude_faces`) ; le noyau n'a pas changé.
+- Écarté : la fenêtre de saisie seule (E-30), jugée peu pratique par JC ; elle reste dans le menu Édition.
+- Effet sur les résultats, les projets : aucun.
+- Confidentialité : non.
+- Vérification : 3 tests (deux faces sélectionnées → `extrude_faces` des deux vers le haut de 0,30 ; face hors sélection seule, flèche gauche → vert, valeur tapée 50 cm ; face d'un solide → renvoi vers Push/Pull) ; test de la barre mis à 20 outils ; vitest 1180 réussis, `tsc -b` et `npm run build` propres. Niveau : testé (banc : 3 scénarios). Non vérifié ici : à la souris (pas de WebGL ici).
+- Limites connues : les faces d'un solide ne sont pas prises (Push/Pull, ou éclater d'abord) ; un double-clic ne répète pas encore la dernière distance.

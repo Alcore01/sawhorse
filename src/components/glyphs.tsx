@@ -22,6 +22,13 @@ export const TOOL_GLYPHS: Record<BuiltinToolId, ReactElement> = {
       <path d="M14 3v5M12 6l2-2 2 2" />
     </>
   ),
+  // sketchcraft E-31: two faces (a roof) with a straight-up arrow.
+  pushaxis: (
+    <>
+      <path d="M3 18l5-5 5 5 M13 18l5-5 3 3 M3 18h18" />
+      <path d="M12 12V3M9.5 5.5L12 3l2.5 2.5" />
+    </>
+  ),
   move: <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />,
   rotate: (
     <>

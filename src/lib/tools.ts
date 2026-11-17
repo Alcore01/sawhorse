@@ -4,7 +4,7 @@
 export type BuiltinToolId =
   | "select" | "erase"
   | "line" | "rect" | "circle" | "arc"
-  | "pushpull" | "move" | "rotate" | "scale" | "offset" | "follow"
+  | "pushpull" | "pushaxis" | "move" | "rotate" | "scale" | "offset" | "follow"
   | "tape" | "protractor" | "dim" | "paint"
   | "section"
   | "orbit" | "pan";
@@ -44,6 +44,8 @@ export const TOOL_GROUPS: ToolDef[][] = [
   ],
   [
     { id: "pushpull", label: "Push", key: "p", keyCap: "P", hint: "Click a face and move. Type 3/4 for 3/4 in. Double-click repeats the last distance.", vcb: "Distance" },
+    // sketchcraft E-31: the other way to push: the selected faces together, along an axis.
+    { id: "pushaxis", label: "Push ax.", key: "", keyCap: "", hint: "Press a face and move: it, or all the selected faces, go up blue together into one solid. Arrows switch the axis. Type 30.", vcb: "Distance" },
     { id: "move", label: "Move", key: "m", keyCap: "M", hint: "Click, move, click. Ctrl copies. Type 36 then x3 for an array.", vcb: "Distance" },
     { id: "rotate", label: "Rotate", key: "q", keyCap: "Q", hint: "Set the protractor on a face, click the start angle, then the end. Type 90.", vcb: "Angle" },
     { id: "scale", label: "Scale", key: "s", keyCap: "S", hint: "Drag a grip. Type 2 for 2x, or 48in for an absolute size.", vcb: "Scale" },

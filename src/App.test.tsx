@@ -40,7 +40,10 @@ describe("App shell", () => {
     // Lane 12's Section Plane has no default key (SketchUp 2017 had none either); lane 30's
     // Orbit and Pan have SketchUp 2017's O and H.
     // sketchcraft E-01: the Protractor, without a default key either.
-    expect(TOOLS).toHaveLength(19);
+    // sketchcraft E-31: Push along an axis, without a default key, under Push.
+    expect(TOOLS).toHaveLength(20);
+    expect(TOOLS.find((t) => t.id === "pushaxis")?.key).toBe("");
+    expect(TOOLS.findIndex((t) => t.id === "pushaxis")).toBe(TOOLS.findIndex((t) => t.id === "pushpull") + 1);
     expect(TOOLS.find((t) => t.id === "section")?.key).toBe("");
     expect(TOOLS.find((t) => t.id === "protractor")?.key).toBe("");
     expect(document.querySelector('.tool[data-tool="protractor"]')).not.toBeNull();

@@ -53,6 +53,7 @@ import { CircleTool } from "./tools/circle";
 import { ArcTool } from "./tools/arc";
 import { DimensionTool, TapeTool } from "./tools/tape";
 import { ProtractorTool } from "./tools/protractor";
+import { PushAxisTool } from "./tools/pushaxis";
 import { SNAP_SWITCHES, disabledKinds } from "./lib/inferenceStyle";
 import { describeMeasure, measureSelection } from "./lib/measure";
 import { annotationView } from "./lib/annotations";
@@ -1437,6 +1438,7 @@ export function App() {
       ["protractor", new ProtractorTool(host)],
       ["dim", new DimensionTool(host)],
       ["pushpull", new PushTool(host)],
+      ["pushaxis", new PushAxisTool(host)],
       ["move", new MoveTool(host)],
       ["rotate", new RotateTool(host)],
       ["scale", new ScaleTool(host)],
