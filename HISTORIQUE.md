@@ -238,3 +238,15 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : `cargo test --workspace` 743 passés, 4 ignorés, aucun échec ; `cargo clippy --workspace --all-targets -- -D warnings` sans erreur ; `cargo fmt --check` propre ; `tsc -b` propre ; `npx vitest run` 1 165 passés, 2 ignorés, aucun échec (avec le noyau WebAssembly compilé sur jc-ms-7c37 le 16 nov., donc d'avant le rebasage : les tests qui en dépendent tournent désormais) ; `npm run build` et ses contrôles passés. Non fait ici : recompiler le noyau WebAssembly (cible wasm32 non téléchargeable), golden:wasm, boolean:diff, corpus:skp, site, Playwright, fuzz long.
 - Limites connues : la branche publiée `jc-volumetrie` (4e503d5) reste l'ancienne base jusqu'à l'envoi de celle-ci.
+
+## H-20261117-2 · évolution · interface · Aire et volume de la sélection (E-10)
+
+- Origine : JC, 17 nov. 2026, 06 h 05 : « ça marche assez bien, il manque par rapport à ce que j'utilise la possibilité d'avoir le volume d'un groupe sélectionné et aussi la surface des faces sélectionnées » ; E-10.
+- Fichiers : `src/lib/measure.ts` (nouveau : `partAreas` calcule l'aire de chaque face affichée à partir de ses triangles ; `measureSelection` additionne l'aire des faces et surfaces d'esquisse choisies et le volume des solides choisis, directement ou dans un groupe ou une copie de composant, chaque solide une fois ; `formatSurface` en m² ou en pieds carrés ; `describeMeasure`) ; `src/lib/measure.test.ts` (3 tests) ; `src/App.tsx` (le badge « Selection » de la vue montre ces mesures).
+- Évolution : avec une sélection, le badge en haut de la vue indique par exemple « Selection: 3 · 2 faces · 52.30 m² » ou « Selection: 1 · 1 solid · 466.183744 m³ ».
+- Écarté : demander les mesures au noyau (il donne déjà le volume de chaque solide, et l'aire se lit sur le maillage affiché : aucun changement du noyau ni du format).
+- Effet sur les résultats : affichage seul.
+- Effet sur les projets existants : aucun.
+- Confidentialité : non.
+- Vérification : 3 tests neufs (aire d'un rectangle de 2 × 3 m et d'un triangle ; faces + surface + groupe + solide déjà compté ; formats m² et pieds carrés), qui échouent sans le module ; suite complète : 1 168 passés (1 165 + 3), 2 ignorés, aucun échec. Niveau : testé ; essai par JC à faire.
+- Limites connues : le volume affiche les décimales du badge du modèle (jusqu'à 6) ; les maillages importés non solides n'ont pas de volume ; l'aire est celle de la face entière (ouvertures comprises si elles ne sont pas découpées).

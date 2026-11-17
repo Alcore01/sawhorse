@@ -54,6 +54,7 @@ import { ArcTool } from "./tools/arc";
 import { DimensionTool, TapeTool } from "./tools/tape";
 import { ProtractorTool } from "./tools/protractor";
 import { SNAP_SWITCHES, disabledKinds } from "./lib/inferenceStyle";
+import { describeMeasure, measureSelection } from "./lib/measure";
 import { annotationView } from "./lib/annotations";
 import { InferenceMemory, kernelResolver, ToolDriver } from "./tools/driver";
 import { friendlyError, setNameSource } from "./lib/names";
@@ -2680,7 +2681,11 @@ export function App() {
         : { text: `Sketch: ${s.regions} region${s.regions === 1 ? "" : "s"} · draw with Rect (R)` },
     );
     if (st.meshes?.length) hud.push({ text: `${plural(st.meshes.length, "mesh")} not solid (imported)`, tone: "err" });
-    if (selection.length) hud.push({ text: `Selection: ${selection.length}` });
+    if (selection.length) {
+      // sketchcraft E-10: what the selection measures (faces' area, solids' volume).
+      const measured = describeMeasure(measureSelection(selection, st, scene?.mesh), units);
+      hud.push({ text: `Selection: ${selection.length}${measured ? ` · ${measured}` : ""}` });
+    }
     else if (target && toolId === "pushpull") hud.push({ text: `Selected: ${describeTarget(target)}` });
   } else if (kernelState === "loading") {
     hud.push({ text: "Kernel loading…" });
