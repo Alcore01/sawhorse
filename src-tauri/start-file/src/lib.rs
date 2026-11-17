@@ -57,7 +57,7 @@ use std::path::{Component, Path, PathBuf};
 /// type. The page's own list is `ALL_EXTENSIONS` in `src/io/files.ts`; `src/io/startup.test.ts`
 /// fails when the two differ.
 pub const EXTENSIONS: &[&str] = &[
-    "shz", "skp", "stl", "3mf", "glb", "gltf", "obj", "dxf", "svg",
+    "shz", "skp", "stl", "3mf", "glb", "gltf", "dae", "obj", "dxf", "svg",
 ];
 
 /// Whether File > Open takes a file of this name (its extension, in any case).

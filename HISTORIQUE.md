@@ -396,3 +396,13 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
   - constat 11 : union de solides qui ne se touchent que par une arête : message clair au lieu de l'erreur brute du moteur booléen ; test (échouait avant).
 - Fichiers : `crates/kernel/src/model.rs`, `crates/kernel/tests/volumetrie_cycle.rs`, `src/components/KeyBar.tsx` et son test, `src/components/Viewport.tsx`, `src/App.tsx`, `src/lib/swSource.ts` et son test, `vite.config.ts`, `public/sw.js` (retiré).
 - Vérification : `cargo test --workspace` 758 réussis, clippy et fmt propres ; vitest 1186 réussis ; `tsc -b` et build propres (`dist/sw.js` écrit avec 87 fichiers). Niveau : testé (banc : 6 scénarios ajoutés). Non vérifié : les e2e Playwright (à lancer chez JC), le service worker sur une vraie tablette.
+
+## H-20261117-16 · évolution · interface · Import COLLADA (.dae) (E-39)
+
+- Origine : JC (17 nov. 2026, 20 h 37) : « pour l'export actuel de geohvac c'est du dae mais volumecraft ne le supporte pas » (capture du sélecteur de fichiers sans .dae) ; E-39.
+- Fichiers : `src/io/dae.ts` (nouveau : lecture par le lecteur COLLADA de three.js, unités et axe vertical du fichier appliqués, maillages ramenés en coordonnées du monde avec une couleur unie, écrits en .glb par l'exporteur glTF de three.js, sans charger aucune image) et son test ; `src/io/files.ts` (type COLLADA dans Import et Ouvrir) ; `src/App.tsx` (un .dae passe au lecteur glTF du noyau sous le nom `<nom>.glb`, avec une note dans le compte rendu ; chargé seulement au premier .dae ; libellés du menu, du glisser-déposer et du refus) ; `src-tauri/start-file/src/lib.rs` (« dae » dans la liste du programme de bureau, gardée égale à celle de la page par `startup.test.ts`).
+- Écarté : un lecteur COLLADA dans le noyau Rust (plus long ; le lecteur glTF existant fait déjà la suite : axe, unités, maillages fermés en solides).
+- Effet sur les projets : aucun ; le noyau n'a pas changé (pas de `npm run wasm` pour cette entrée).
+- Confidentialité : non (lecture locale ; aucune image ni adresse du fichier n'est chargée).
+- Vérification : 2 tests (une boîte de 2 × 1 × 1 m écrite en centimètres, Z vers le haut, devient un .glb de 2 × 1 × 1 m, Y vers le haut, avec la note « 1 mesh, 12 triangles » ; un fichier qui n'est pas du COLLADA est refusé) ; vitest 1188 réussis ; tests du lanceur de bureau (25) ; build propre (lecteur dans un morceau à part de 92 kB). Niveau : testé (banc : 2 scénarios). Non vérifié : un vrai export de GeoHVAC ; l'import complet par le noyau (WASM).
+- Limites connues : textures laissées de côté (couleur unie) ; les maillages non fermés restent des maillages importés (non solides), comme pour le glTF.

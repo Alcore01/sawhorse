@@ -841,8 +841,18 @@ export function App() {
       let empty: EmptySkp | null = null;
       const r = await run(
         async (k) => {
-          const res = ext === ".skp" ? await k.importSkp(f.name, f.bytes) : await k.importFile(f.name, f.bytes, { units: importUnits });
-          notes = res.notes;
+          // sketchcraft E-39: COLLADA goes to the kernel as glTF (src/io/dae.ts).
+          let daeNotes: string[] = [];
+          let file = { name: f.name, bytes: f.bytes };
+          if (ext === ".dae") {
+            // Loaded on the first .dae only (the COLLADA reader and the glTF writer).
+            const { daeToGlb } = await import("./io/dae");
+            const c = await daeToGlb(new TextDecoder().decode(f.bytes));
+            daeNotes = c.notes;
+            file = { name: `${stem(f.name)}.glb`, bytes: c.glb };
+          }
+          const res = ext === ".skp" ? await k.importSkp(file.name, file.bytes) : await k.importFile(file.name, file.bytes, { units: importUnits });
+          notes = [...daeNotes, ...res.notes];
           if (!("empty" in res && res.empty)) return res as EditResult;
           // Lane 15: an empty SketchUp file (a blank template) opens as an empty model in its
           // own units and style, in place of the current one.
@@ -936,7 +946,7 @@ export function App() {
         const ext = extensionOf(f.name);
         if (ext === ".shz") await openBytes(f);
         else if (ALL_EXTENSIONS.includes(ext)) await importBytes(f);
-        else setMessage({ text: `${f.name}: not a file ${APP_NAME} can open (use .shz, .skp, STL, 3MF, glTF, OBJ, DXF or SVG).`, error: true });
+        else setMessage({ text: `${f.name}: not a file ${APP_NAME} can open (use .shz, .skp, STL, 3MF, glTF, COLLADA (.dae), OBJ, DXF or SVG).`, error: true });
       }
     },
     [openBytes, importBytes],
@@ -948,7 +958,7 @@ export function App() {
     async (files: File[]) => {
       for (const f of files) {
         if (!ALL_EXTENSIONS.includes(extensionOf(f.name))) {
-          setMessage({ text: `${f.name}: not a file ${APP_NAME} can open (use .shz, .skp, STL, 3MF, glTF, OBJ, DXF or SVG).`, error: true });
+          setMessage({ text: `${f.name}: not a file ${APP_NAME} can open (use .shz, .skp, STL, 3MF, glTF, COLLADA (.dae), OBJ, DXF or SVG).`, error: true });
           continue;
         }
         try {
@@ -2927,7 +2937,7 @@ export function App() {
         { label: "Save", keys: "Ctrl+S", onSelect: () => void save(false) },
         { label: "Save As…", keys: "Ctrl+Shift+S", onSelect: () => void save(true) },
         "-",
-        { label: "Import…", keys: "Ctrl+I", title: "SketchUp, STL, 3MF, glTF, OBJ, DXF or SVG, as one undo step", onSelect: () => void importDialog() },
+        { label: "Import…", keys: "Ctrl+I", title: "SketchUp, STL, 3MF, glTF, COLLADA (.dae), OBJ, DXF or SVG, as one undo step", onSelect: () => void importDialog() },
         {
           label: "Import units",
           items: IMPORT_UNITS.map((x) => ({
@@ -3199,7 +3209,7 @@ export function App() {
           void takeBrowserFiles(files);
         }}
       />
-      {dragging ? <div className="drop-hint">Drop a .shz to open it, or a SketchUp, STL, 3MF, glTF, OBJ, DXF or SVG file to import it</div> : null}
+      {dragging ? <div className="drop-hint">Drop a .shz to open it, or a SketchUp, STL, 3MF, glTF, COLLADA, OBJ, DXF or SVG file to import it</div> : null}
       {isWebDemo() ? <DemoBanner /> : null}
       {report ? <ImportReport report={report} onClose={() => setReport(null)} /> : null}
       {nameRequest ? <NameDialog req={nameRequest} onClose={() => setNameRequest(null)} /> : null}

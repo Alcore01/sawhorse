@@ -70,6 +70,8 @@ export const IMPORT_TYPES: FileType[] = [
   { description: "STL", mime: "model/stl", extensions: [".stl"] },
   { description: "3MF", mime: "model/3mf", extensions: [".3mf"] },
   { description: "glTF", mime: "model/gltf-binary", extensions: [".glb", ".gltf"] },
+  // sketchcraft E-39: COLLADA (GeoHVAC's export), read through src/io/dae.ts.
+  { description: "COLLADA", mime: "model/vnd.collada+xml", extensions: [".dae"] },
   { description: "Wavefront OBJ", mime: "model/obj", extensions: [".obj"] },
   { description: "DXF", mime: "image/vnd.dxf", extensions: [".dxf"] },
   { description: "SVG", mime: "image/svg+xml", extensions: [".svg"] },
