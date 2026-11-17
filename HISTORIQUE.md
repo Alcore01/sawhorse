@@ -430,3 +430,13 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Effet sur les résultats : les coins bougent de 5 cm au plus ; le volume change d'autant.
 - Confidentialité : non.
 - Vérification : 2 scénarios (bloc 4 × 4 m au toit en deux triangles dont un coin est 2 cm plus haut, unifié puis toit fusionné : une face de moins, étanche, 16 × 3,005 m³ ; faces d'une boîte à angle droit : refus, modèle inchangé) ; un scénario de E-40 couvre le toit seul (plancher à 0). `cargo test --workspace` 762 réussis, clippy et fmt propres ; vitest 1188 réussis ; build propre. Niveau : testé (banc : 2 scénarios). Non vérifié : sur le bâtiment de JC dans l’application.
+
+## H-20261117-19 · évolution · module|interface · Fusion automatique des faces presque coplanaires (E-42)
+
+- Origine : JC (17 nov. 2026, 23 h 19) : « il faudrait un automerge pour cela » (après Merge Faces, H-20261117-18) ; E-42.
+- Fichiers : `crates/kernel/src/model.rs` (op `AutoMergeFaces`, issue `AutoMerged` ; `merge_faces` réécrit autour de la fonction `merged_object`, sans changement de comportement ; `auto_merged` ; `unify_25d` l'appelle en fin de reconstruction et le dit dans ses notes) ; `crates/kernel/tests/unify_mesh.rs` (test du toit en deux triangles réécrit : Unify le fusionne de lui-même ; 2 scénarios ajoutés sur une boîte dont le dessus est coupé en deux) ; `src/kernel/types.ts` ; `src/App.tsx` (Édition > Auto Merge Faces, sur le ou les solides choisis, une étape d'annulation).
+- Évolution : à partir de chaque face (la plus grande d'abord), ses voisines par une arête la rejoignent tant qu'elles regardent à moins de 5° d'elle et que tous leurs coins restent à 5 cm d'un même plan ; chaque groupe de deux faces ou plus est fusionné comme par Merge Faces ; un groupe qui ferait plier une face voisine est laissé ; on recommence jusqu'à ce que plus rien ne fusionne. Unify Imported Meshes le fait de lui-même.
+- Effet sur les résultats : coins déplacés de 5 cm au plus ; volume changé d'autant (bâtiment 5719E678 : 914,45 → 914,49 m³).
+- Confidentialité : non (essai local sur le fichier de JC, copie dérivée effacée ensuite).
+- Vérification : 3 scénarios (toit en deux triangles décalés de 2 cm : une face de toit après Unify, 6 faces, étanche ; dessus coupé en deux fusionné par Merge Faces ; trouvé seul par Auto Merge, rien d'autre ne change, un second passage ne change rien) ; essai local du fichier de JC : 26 → 20 faces, étanche. `cargo test --workspace` 764 réussis, clippy et fmt propres ; vitest 1188 réussis ; build propre. Niveau : testé (banc : 3 scénarios). Non vérifié : dans l’application chez JC.
+- Limites connues : seuils fixes (5°, 5 cm) ; des pans séparés par plus de 5° restent distincts (c'est voulu : ce sont de vrais pans).

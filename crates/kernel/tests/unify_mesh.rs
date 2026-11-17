@@ -4,7 +4,7 @@
 //! rebuilt as one solid from its roof.
 
 use sawhorse_kernel::meshbuild::ImportItem;
-use sawhorse_kernel::model::{Model, Op, OpOutcome};
+use sawhorse_kernel::model::{DrawTarget, Model, Op, OpOutcome};
 
 fn item(positions: Vec<[f64; 3]>, tris: &[[u32; 3]]) -> ImportItem {
     ImportItem {
@@ -114,9 +114,9 @@ fn a_mesh_without_a_roof_is_refused_and_kept() {
 }
 
 /// A 4 x 4 m flat-roofed block whose roof is two triangles, one corner 2 cm high: unified,
-/// then (sketchcraft E-41) its two roof faces merged into one flat face.
+/// its two roof triangles are merged into one flat pan by themselves (sketchcraft E-42).
 #[test]
-fn nearly_coplanar_roof_faces_merge_into_one_flat_face() {
+fn unify_merges_nearly_coplanar_roof_triangles_into_one_pan() {
     let it = item(
         vec![
             [0.0, 0.0, 3.0],
@@ -129,29 +129,99 @@ fn nearly_coplanar_roof_faces_merge_into_one_flat_face() {
     );
     let mut m = imported(it);
     let mesh = m.meshes()[0].0;
-    m.apply(&Op::UnifyMesh { mesh }).unwrap();
-    let (oid, o) = m.objects()[0];
-    let p = o.brep().to_polys();
-    let roof: Vec<u64> = (0..p.faces.len())
-        .filter(|&i| {
-            p.plane(i).is_some_and(|pl| pl.normal.z.abs() > 0.5)
-                && p.faces[i].outer.iter().all(|&v| p.points[v].z > 1.0)
-        })
-        .map(|i| p.faces[i].id.unwrap())
-        .collect();
-    assert_eq!(roof.len(), 2, "two roof triangles before");
-    let faces_before = m.stats().faces;
-    let out = m
-        .apply(&Op::MergeFaces {
-            object: oid,
-            faces: roof,
-        })
-        .unwrap();
-    assert!(matches!(out, OpOutcome::FacesMerged { .. }), "{out:?}");
-    assert_eq!(m.stats().faces, faces_before - 1);
+    let out = m.apply(&Op::UnifyMesh { mesh }).unwrap();
+    let OpOutcome::MeshUnified { notes, .. } = out else {
+        panic!("{out:?}")
+    };
+    assert!(
+        notes
+            .iter()
+            .any(|n| n.contains("merged into their neighbours")),
+        "{notes:?}"
+    );
+    assert_eq!(m.stats().faces, 6, "a roof, four walls, a floor");
     assert!(m.stats().watertight);
     let v = m.stats().volume_m3;
     assert!((v - 16.0 * 3.005).abs() < 0.01, "{v}");
+}
+
+/// A 1 m box whose top a line drawn across has cut in two.
+fn box_with_a_cut_top() -> Model {
+    let mut m = Model::with_ground_sketch();
+    m.apply(&Op::AddRectangle {
+        sketch: 1,
+        x: 0.0,
+        y: 0.0,
+        w: 1.0,
+        h: 1.0,
+    })
+    .unwrap();
+    m.apply(&Op::Extrude {
+        sketch: 1,
+        region: 1,
+        distance: 1.0,
+    })
+    .unwrap();
+    m.apply(&Op::Draw {
+        target: DrawTarget::Face { object: 1, face: 2 },
+        points: vec![[0.0, 0.5, 1.0], [1.0, 0.5, 1.0]],
+        closed: false,
+        curve: None,
+    })
+    .unwrap();
+    assert_eq!(m.stats().faces, 7);
+    m
+}
+
+fn top_faces(m: &Model) -> Vec<u64> {
+    let (_, o) = m.objects()[0];
+    let p = o.brep().to_polys();
+    (0..p.faces.len())
+        .filter(|&i| p.faces[i].outer.iter().all(|&v| p.points[v].z > 0.99))
+        .map(|i| p.faces[i].id.unwrap())
+        .collect()
+}
+
+#[test]
+fn two_faces_in_one_plane_merge_back_into_one() {
+    // sketchcraft E-41.
+    let mut m = box_with_a_cut_top();
+    let top = top_faces(&m);
+    assert_eq!(top.len(), 2);
+    m.apply(&Op::MergeFaces {
+        object: 1,
+        faces: top,
+    })
+    .unwrap();
+    assert_eq!(m.stats().faces, 6);
+    assert!(m.stats().watertight);
+    assert!((m.stats().volume_m3 - 1.0).abs() < 1e-12);
+}
+
+#[test]
+fn auto_merge_finds_them_by_itself_and_leaves_the_rest() {
+    // sketchcraft E-42: the two halves of the top merge; the sides, at right angles, do not.
+    let mut m = box_with_a_cut_top();
+    let out = m.apply(&Op::AutoMergeFaces { object: 1 }).unwrap();
+    assert_eq!(
+        out,
+        OpOutcome::AutoMerged {
+            object: 1,
+            merged: 1
+        }
+    );
+    assert_eq!(m.stats().faces, 6);
+    assert!((m.stats().volume_m3 - 1.0).abs() < 1e-12);
+    // Nothing more to merge: nothing changes.
+    let h = m.hash();
+    assert_eq!(
+        m.apply(&Op::AutoMergeFaces { object: 1 }).unwrap(),
+        OpOutcome::AutoMerged {
+            object: 1,
+            merged: 0
+        }
+    );
+    assert_eq!(m.hash(), h);
 }
 
 #[test]

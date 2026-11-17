@@ -1980,6 +1980,20 @@ export function App() {
     if (r?.outcome.kind === "faces_merged") select([{ kind: "face", object: objects[0], face: r.outcome.face }]);
   }, [apply, select]);
 
+  /** sketchcraft E-42: Edit > Auto Merge Faces: in each selected solid, every group of faces
+   * side by side and nearly in one plane (5°, 5 cm) made one face; one undo step. */
+  const autoMergeFaces = useCallback(async () => {
+    const sel = live.current.selection;
+    const objects = [...new Set(sel.flatMap((x) => (x.kind === "object" || x.kind === "face" ? [x.object] : [])))];
+    if (!objects.length) return void setMessage({ text: "Select a solid (double-click it) to merge its faces.", error: true });
+    const ops: KernelOp[] = objects.map((object) => ({ op: "auto_merge_faces", object }));
+    await apply(ops.length === 1 ? ops[0] : { op: "batch", ops }, (r) => {
+      const outs = r.outcome.kind === "batch" ? r.outcome.outcomes : [r.outcome];
+      const n = outs.reduce((a, o) => a + (o.kind === "auto_merged" ? o.merged : 0), 0);
+      return n ? `Merged ${plural(n, "face")} into their neighbours (within 5° and 5 cm of one plane).` : "Nothing to merge: no faces side by side within 5° and 5 cm of one plane.";
+    });
+  }, [apply]);
+
   /** sketchcraft E-40: Edit > Unify Imported Meshes: each imported mesh, one undo step
    * each, rebuilt as a solid from its roof; what each became, or why not, in a report. */
   const unifyMeshes = useCallback(async () => {
@@ -3092,6 +3106,12 @@ export function App() {
           onSelect: () => void mergeFaces(),
         },
         {
+          label: "Auto Merge Faces",
+          title: "sketchcraft: in the selected solid, every group of faces side by side and nearly in one plane (within 5° and 5 cm) made one face",
+          disabled: !selection.some((x) => x.kind === "object" || x.kind === "face"),
+          onSelect: () => void autoMergeFaces(),
+        },
+        {
           label: "Unify Imported Meshes",
           title: "sketchcraft: each imported building mesh that is not a solid (a GeoHVAC .dae) rebuilt as one solid from its roof: roof pieces sewn, upright walls, a flat floor",
           disabled: !st?.meshes?.length,
@@ -3192,7 +3212,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;

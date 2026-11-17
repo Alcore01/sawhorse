@@ -65,6 +65,8 @@ export type KernelOp =
   | { op: "unify_mesh"; mesh: number }
   // sketchcraft E-41: faces of one solid nearly in one plane made one flat face.
   | { op: "merge_faces"; object: number; faces: number[] }
+  // sketchcraft E-42: every group of nearly coplanar neighbouring faces of a solid merged.
+  | { op: "auto_merge_faces"; object: number }
   | { op: "delete_node"; node: number }
   | { op: "rename"; item: Item; name: string | null }
   | { op: "rename_definition"; definition: number; name: string }
@@ -395,6 +397,7 @@ export type OpOutcome =
   | { kind: "renamed" }
   | { kind: "mesh_deleted" }
   | { kind: "mesh_unified"; object: number; notes: string[] }
+  | { kind: "auto_merged"; object: number; merged: number }
   | { kind: "part_set" }
   | { kind: "loose_grouped"; groups: number[] }
   | { kind: "edges_set"; changed: number }
