@@ -323,3 +323,9 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 3 tests (deux faces sélectionnées → `extrude_faces` des deux vers le haut de 0,30 ; face hors sélection seule, flèche gauche → vert, valeur tapée 50 cm ; face d'un solide → renvoi vers Push/Pull) ; test de la barre mis à 20 outils ; vitest 1180 réussis, `tsc -b` et `npm run build` propres. Niveau : testé (banc : 3 scénarios). Non vérifié ici : à la souris (pas de WebGL ici).
 - Limites connues : les faces d'un solide ne sont pas prises (Push/Pull, ou éclater d'abord) ; un double-clic ne répète pas encore la dernière distance.
+
+## H-20261117-9 · évolution · interface · Vues : Left sur la barre, Persp et Iso en premier (E-32)
+
+- Origine : JC (17 nov. 2026, 09 h 26) : « dans les vues il manque "left" , je placerai perspective et isométrique en premier dans la liste c'est plus logique » ; E-32.
+- Fichiers : `src/viewport/camera.ts` (ordre de `VIEWS`, Left n'est plus réservée au menu) ; `src/viewport/camera.test.ts`, `src/App.test.tsx` (ordre attendu).
+- Vérification : vitest 1180 réussis, `tsc -b` et build propres. Les e2e Playwright cliquent les boutons par leur nom (pas d'effet attendu), non lancés ici. La vue au démarrage reste Iso.

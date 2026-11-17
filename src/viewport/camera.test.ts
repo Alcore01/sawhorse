@@ -4,13 +4,13 @@ import { M_PER_IN } from "../lib/units";
 
 describe("standard views", () => {
   it("offers the six square views, Iso and Persp; only Persp is in perspective", () => {
-    expect(VIEWS.map((v) => v.label)).toEqual(["Iso", "Top", "Bottom", "Front", "Back", "Left", "Right", "Persp"]);
-    expect(VIEWS.map((v) => projectionForView(v.id))).toEqual(["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "perspective"]);
+    expect(VIEWS.map((v) => v.label)).toEqual(["Persp", "Iso", "Top", "Bottom", "Front", "Back", "Left", "Right"]);
+    expect(VIEWS.map((v) => projectionForView(v.id))).toEqual(["perspective", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]);
   });
 
-  it("keeps the mock's five on the top bar; Bottom, Back and Left are on the View menu", () => {
-    expect(BAR_VIEWS.map((v) => v.label)).toEqual(["Iso", "Top", "Front", "Right", "Persp"]);
-    expect(VIEWS.filter((v) => v.menuOnly).map((v) => v.id)).toEqual(["bottom", "back", "left"]);
+  it("keeps six on the top bar, Persp and Iso first (sketchcraft E-32); Bottom and Back are on the View menu", () => {
+    expect(BAR_VIEWS.map((v) => v.label)).toEqual(["Persp", "Iso", "Top", "Front", "Left", "Right"]);
+    expect(VIEWS.filter((v) => v.menuOnly).map((v) => v.id)).toEqual(["bottom", "back"]);
   });
 
   it("looks from where each name says (Z up)", () => {

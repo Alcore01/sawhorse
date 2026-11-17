@@ -8,18 +8,19 @@ export type ViewId = "iso" | "top" | "bottom" | "front" | "back" | "left" | "rig
 export type Projection = "parallel" | "perspective";
 
 /** The standard views, in the View menu's order. `menuOnly` ones have no button on the top bar. */
+// sketchcraft E-32 (JC, 17 nov. 2026): Persp and Iso first, and Left on the bar.
 export const VIEWS: { id: ViewId; label: string; title: string; menuOnly?: boolean }[] = [
+  { id: "persp", label: "Persp", title: "Three-quarter perspective view" },
   { id: "iso", label: "Iso", title: "Isometric view (parallel projection)" },
   { id: "top", label: "Top", title: "Top view, looking down -Z" },
   { id: "bottom", label: "Bottom", title: "Bottom view, looking up +Z (the front edge at the top, +X runs right)", menuOnly: true },
   { id: "front", label: "Front", title: "Front view, looking along +Y" },
   { id: "back", label: "Back", title: "Back view, looking along -Y", menuOnly: true },
-  { id: "left", label: "Left", title: "Left view, looking along +X", menuOnly: true },
+  { id: "left", label: "Left", title: "Left view, looking along +X" },
   { id: "right", label: "Right", title: "Right view, looking along -X" },
-  { id: "persp", label: "Persp", title: "Three-quarter perspective view" },
 ];
 
-/** The views with a button on the top bar (the mock's five); the rest are on the View menu. */
+/** The views with a button on the top bar (sketchcraft E-32: six, Persp and Iso first); the rest are on the View menu. */
 export const BAR_VIEWS = VIEWS.filter((v) => !v.menuOnly);
 
 /** Camera direction (from the target toward the eye) and up vector per standard view. */

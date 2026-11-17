@@ -30,7 +30,7 @@ describe("App shell", () => {
     expect(document.querySelector(".app > footer.vcb")).not.toBeNull();
     // Lane 15: no render service answering here, so no Credits chip.
     expect(screen.queryByText("Credits")).toBeNull();
-    for (const v of ["Iso", "Top", "Front", "Right", "Persp"]) expect(screen.getByRole("button", { name: v })).toBeTruthy();
+    for (const v of ["Persp", "Iso", "Top", "Front", "Left", "Right"]) expect(screen.getByRole("button", { name: v })).toBeTruthy();
   });
 
   it("shows every tool with its 2017-default key cap", () => {
