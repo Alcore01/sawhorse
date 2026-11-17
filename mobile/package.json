@@ -1,0 +1,16 @@
+{
+  "name": "volumecraft-android",
+  "private": true,
+  "description": "sketchcraft E-35: VolumeCraft as an Android app (Capacitor wraps the built web app, ../dist; everything runs on the tablet, offline).",
+  "license": "MIT OR Apache-2.0",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/core": "8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.2"
+  }
+}

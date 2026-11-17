@@ -34,3 +34,20 @@ fichier obtenu est le même pour les deux systèmes. Donc :
      son empreinte (`EMPREINTES.txt`) ; la version précédente est gardée dans `sauvegardes\`.
    - Raccourcis « sketchcraft » sur le Bureau et dans le menu Démarrer.
 3. Retirer les raccourcis : `installer.cmd -Retirer`.
+
+## Tablette Android (APK)
+
+L'application Android emporte VolumeCraft entier : tout tourne sur la tablette, sans réseau
+ni hébergement. Elle se construit sur la machine Linux, une fois installés :
+
+- Java 21 : `sudo apt install openjdk-21-jdk` ;
+- le kit Android : installer Android Studio (developer.android.com/studio) et l'ouvrir une
+  fois (il met le kit dans `~/Android/Sdk`).
+
+Puis, dans le dossier du code :
+
+    scripts/sketchcraft/build-apk.sh
+
+L'APK est rangé dans `~/sketchcraft/apk/VolumeCraft-<date>.apk`. Le copier sur la tablette,
+l'ouvrir et autoriser l'installation depuis cette source. Au stylet, les touches qui manquent
+(Échap, Entrée, axes, Maj, Annuler) sont des boutons au-dessus de la vue.

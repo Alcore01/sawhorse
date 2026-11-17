@@ -351,3 +351,15 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non (rien ne quitte l'appareil ; le service worker ne met en cache que l'application elle-même).
 - Vérification : 1 test (les 9 boutons envoient les bonnes touches, Maj enfoncée puis relâchée, fermeture) ; vitest 1181 réussis ; `tsc -b`, build et contrôles de provenance propres ; `dist` contient le manifeste, `sw.js` et les icônes. Niveau : testé (banc : 1 scénario). Non vérifié : sur une vraie tablette (installation, hors ligne, stylet, survol du stylet pour l'accrochage), le rendu de la barre.
 - Limites connues : il faut un hébergement HTTPS pour installer (à décider avec JC) ; l'accrochage par survol dépend d'un stylet qui signale le survol (S Pen, par exemple) ; sans survol, les points de référence ne se mémorisent pas.
+
+## H-20261117-12 · évolution · interface|documentation · Projet Android (APK) avec Capacitor (E-35)
+
+- Origine : JC (17 nov. 2026, 12 h 14) : « tu peux faire un apk à instaler » ; E-35 (suite de E-34).
+- Constat : l'APK ne peut pas être construit dans l'environnement de Claude : le réseau y refuse dl.google.com (kit Android) et services.gradle.org (Gradle), comme static.rust-lang.org. Il se construit donc sur la machine Linux de JC.
+- Fichiers : `mobile/` (nouveau : `package.json` avec Capacitor 8.6.2, `capacitor.config.json` : appId `org.volumecraft.app`, nom VolumeCraft, application web prise dans `../dist` ; `android/` : projet Gradle produit par `cap add android`, icônes remplacées par celle du programme ; `.gitignore`) ; `scripts/sketchcraft/build-apk.sh` (vérifie Java 21 et le kit Android, construit noyau et application web, synchronise, `gradlew assembleDebug`, range l'APK sous un nom daté sans rien écraser) ; `scripts/sketchcraft/LISEZMOI.md` (section Tablette Android) ; `src/main.tsx` (pas de service worker dans l'application Android, qui emporte ses fichiers).
+- Évolution : une application Android qui contient tout VolumeCraft (WebView : WebGL 2 et WASM), hors ligne, sans hébergement ni publication. Les touches à l'écran de E-34 y servent.
+- Écarté : Tauri pour Android (cibles Rust Android et NDK en plus, rien de plus pour l'usage) ; une application web de confiance (TWA) ou une PWA hébergée (elles demandent une publication HTTPS).
+- Effet sur les résultats, les projets : aucun. Les fichiers .shz s'ouvrent et s'enregistrent par les boîtes de dialogue du navigateur intégré (non éprouvé sur Android).
+- Confidentialité : non (rien ne quitte la tablette).
+- Vérification : `cap add android` réussi ici ; syntaxe du script vérifiée (`bash -n`) ; vitest 1181 réussis, `tsc -b` et build propres. Non vérifié : la construction Gradle et l'APK (kit Android injoignable ici), l'installation et l'usage sur la tablette ; à faire par JC.
+- Limites connues : APK de débogage (signé avec la clé de débogage : installation manuelle, pas pour le Play Store) ; ouvrir et enregistrer des fichiers sur Android reste à éprouver.

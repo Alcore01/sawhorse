@@ -1,0 +1,8 @@
+{
+  "appId": "org.volumecraft.app",
+  "appName": "VolumeCraft",
+  "webDir": "../dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}
