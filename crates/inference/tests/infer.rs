@@ -947,3 +947,32 @@ fn a_hovered_points_alignment_crosses_a_guide_and_an_edge() {
     let r = run(&m, &q);
     assert!(close(r.point, [1.2, 0.0, 0.0]), "{r:?}");
 }
+
+#[test]
+fn a_line_along_an_axis_stops_level_with_a_hovered_point_off_its_plane() {
+    // sketchcraft E-29 (JC, 17 nov. 2026, 07 h 45): the ridge from the gable's apex runs
+    // along green; the back corner of the wall (lower, and to the side) was hovered: the
+    // ridge ends level with it in green, though no axis line through the corner meets it.
+    let m = model(&[]);
+    let target = DVec3::new(0.002, 3.001, 1.5);
+    let dir = DVec3::new(1.0, 0.6, -0.8).normalize();
+    let eye = target - dir * 20.0;
+    let q = InferQuery {
+        origin: eye.to_array(),
+        dir: dir.to_array(),
+        px: PixelModel {
+            ortho: true,
+            scale: 0.001,
+            eye: eye.to_array(),
+            forward: dir.to_array(),
+        },
+        start: Some([0.0, 0.0, 1.5]),
+        anchors: vec![[1.0, 3.0, 1.0]],
+        grid: false,
+        ..down(0.0, 0.0, 0.001)
+    };
+    let r = run(&m, &q);
+    assert_eq!(r.kind, K::FromPoint, "{r:?}");
+    assert!(close(r.point, [0.0, 3.0, 1.5]), "{:?}", r.point);
+    assert_eq!(r.lines.len(), 2);
+}

@@ -289,3 +289,15 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 4 scénarios (boîte → 6 faces d'aire totale 10 m² ; 6 faces → volume 2 m³ ; 5 faces → refus, rien de changé ; dessus retiré + toit à deux pans → 9 faces → 2,5 m³ étanche) ; `cargo test --workspace` 750 réussis, clippy et fmt propres ; vitest 1174 réussis, `tsc -b` et `npm run build` propres. Niveau : testé (banc : 4 scénarios). Non vérifié ici : les entrées du menu à la souris, le WASM (à construire chez JC).
 - Limites connues : matières, étiquettes, arêtes adoucies et courbes du volume éclaté sont perdues ; il faut choisir toutes les faces à la main (pas encore de « sélectionner les faces connexes ») ; deux faces coplanaires voisines restent deux faces du solide refait.
+
+## H-20261117-6 · correction · module · Faîtage aligné sur un coin survolé (E-29)
+
+- Origine : JC (17 nov. 2026, 07 h 45) : « j'essaye de construire la ligne du faite en utilisant la profondeur de la façade mais au moment de faire la jonction avec le trais vert il perd le croisement » (3 captures) ; E-29.
+- Constat : « From Point » ne cherchait que le croisement exact entre la ligne d'axe du départ et une ligne d'axe passant par le point survolé. Le coin arrière du mur est plus bas que le sommet du pignon : ces deux droites ne se coupent pas dans l'espace, donc aucun croisement, et seule « On Green Axis » restait.
+- Fichiers : `crates/inference/src/infer.rs` (le point de la ligne du départ à l'aplomb du point survolé, c'est-à-dire au même niveau le long de cette ligne) ; `crates/inference/tests/infer.rs` (1 scénario).
+- Correction : le long d'une ligne d'axe (ou parallèle, perpendiculaire) depuis le départ, le point au niveau d'un point survolé est proposé « From Point », avec les deux lignes pointillées.
+- Écarté : projeter le point survolé sur le plan du sommet seulement (ne couvrait pas les lignes parallèles ou perpendiculaires).
+- Effet sur les résultats, les projets : aucun.
+- Confidentialité : non.
+- Vérification : 1 scénario, qui échouait avant (« On Green Axis ») et passe ; `cargo test --workspace` 751 réussis ; clippy et fmt propres. Niveau : testé (banc : 1 scénario). Non vérifié ici : à la souris (le WASM est à reconstruire chez JC).
+- Limites connues : il faut avoir survolé le coin pendant le tracé, comme dans SketchUp.

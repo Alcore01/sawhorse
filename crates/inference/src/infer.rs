@@ -426,6 +426,19 @@ pub fn infer(scene: &Scene, q: &InferQuery) -> Option<Inference> {
     if let Some(s) = start {
         for (ds, ks) in start_directions(q, &ctx) {
             for &a in &anchors {
+                // sketchcraft E-29: level with the anchor along the line (the point of the line
+                // square to it from the anchor), though no axis line through the anchor meets
+                // it: a ridge along green ends level with a lower back corner, as in SketchUp.
+                let u = (a - s).dot(ds);
+                let p = s + ds * u;
+                if u.abs() > 1e-9
+                    && p.distance(a) > 1e-9
+                    && let Some(mut c) = ctx.point(InferenceKind::FromPoint, p, None)
+                {
+                    c.kind = InferenceKind::FromPoint;
+                    c.lines = vec![line(s, p, ks), line(a, p, InferenceKind::FromPoint)];
+                    points.push(c);
+                }
                 for &da in &AXES {
                     if !ctx.in_plane(da) || ds.cross(da).length() < 1e-9 {
                         continue;
