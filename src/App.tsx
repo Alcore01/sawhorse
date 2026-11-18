@@ -60,7 +60,7 @@ import { annotationView } from "./lib/annotations";
 import { InferenceMemory, kernelResolver, ToolDriver } from "./tools/driver";
 import { friendlyError, setNameSource } from "./lib/names";
 import { explodeOps } from "./lib/curves";
-import { autosaveEnabled, clearAutosave, clearOffered, describeAutosave, loadOffered, logIsWorth, MAX_AUTOSAVE_BYTES, saveAutosave, takeAutosave, worthRestoring, type Autosave } from "./lib/autosave";
+import { autosaveEnabled, clearAutosave, clearOffered, describeAutosave, loadOffered, logIsWorth, MAX_AUTOSAVE_BYTES, pageWasReloaded, saveAutosave, takeAutosave, worthRestoring, type Autosave } from "./lib/autosave";
 import { ALL_EXTENSIONS, askYesNo, extensionOf, IMPORT_TYPES, isTauri, onTauriDrop, pickFile, readBrowserFile, saveFile, SHZ, stem, takeTauriPaths, type FileHandle, type PickedFile } from "./io/files";
 import { closeHandler, desktopShell, discardQuestion } from "./io/closing";
 import { notOpenedNote, openLabel, startupOrder, takeStartupFile, waitingNote } from "./io/startup";
@@ -1208,9 +1208,16 @@ export function App() {
     };
   }, []);
 
+  // sketchcraft E-44: after a reload of the page, the work comes back by itself (once).
+  const reloadRestored = useRef(false);
   useEffect(() => {
     if (!pendingRestore) return;
     const usable = pendingRestore.state === "ok";
+    if (usable && !startupWaiting && !reloadRestored.current && pageWasReloaded()) {
+      reloadRestored.current = true;
+      void restore(pendingRestore);
+      return;
+    }
     const waiting = startupWaiting ? ` ${waitingNote(startupWaiting)}` : "";
     setMessage({
       text: usable ? `Restore unsaved work? ${describeAutosave(pendingRestore)}.${waiting}` : `Unsaved work was kept in this browser, but ${describeAutosave(pendingRestore)}; it is set aside, not loaded.${waiting}`,

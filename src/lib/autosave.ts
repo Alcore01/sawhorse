@@ -51,6 +51,20 @@ export function autosaveEnabled(search = typeof location !== "undefined" ? locat
   return new URLSearchParams(search).get("autosave") !== "0";
 }
 
+/** sketchcraft E-44: the page was reloaded (F5, Ctrl+R, the reload button), not opened
+ * afresh: the work autosaved a moment ago comes back by itself, without the question. */
+export function pageWasReloaded(nav: { type?: string } | undefined = navigationEntry()): boolean {
+  return nav?.type === "reload";
+}
+
+function navigationEntry(): { type?: string } | undefined {
+  try {
+    return performance.getEntriesByType("navigation")[0] as unknown as { type?: string } | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** A log worth offering back: more than the ground sketch that every document starts with. */
 export function worthRestoring(a: Autosave | AutosaveMeta | null): a is Autosave {
   return !!a && typeof a === "object" && a.worth === true;

@@ -34,3 +34,12 @@ describe("dev autosave", () => {
     await clearOffered();
   });
 });
+
+describe("after a reload (sketchcraft E-44)", () => {
+  it("tells a reload from a fresh opening", async () => {
+    const { pageWasReloaded } = await import("./autosave");
+    expect(pageWasReloaded({ type: "reload" })).toBe(true);
+    expect(pageWasReloaded({ type: "navigate" })).toBe(false);
+    expect(pageWasReloaded(undefined)).toBe(false);
+  });
+});

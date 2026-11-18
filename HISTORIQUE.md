@@ -459,3 +459,13 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Effet sur les résultats : des points de toit à moins de 5 cm sont confondus (sans effet sensible sur une volumétrie).
 - Vérification : le scénario ; essai local du fichier de JC : un solide étanche de 581,40 m³ (le volume sous les triangles du toit du fichier vaut 581,6 m³ ; plancher 176,6 m²), 25 faces après fusion automatique ; `cargo test --workspace` 765 réussis, clippy et fmt propres. Niveau : testé (banc : 1 scénario) et essayé sur le fichier réel hors de l'application.
 - Suite : la cause est à l'export de GeoHVAC (morceaux non cousus) ; note explicative demandée par JC pour « Profondeur Alpha » (11 h 30).
+
+## H-20261118-3 · évolution · interface · Le modèle revient de lui-même après un rechargement de la page (E-44)
+
+- Origine : JC (18 nov. 2026, 12 h 46) : « si je met à jour la page je perds tout le modele chargé » ; E-44.
+- Constat : le modèle n'était pas perdu. Sawhorse le garde dans le navigateur après chaque modification (sauvegarde automatique) et, au chargement, propose dans la barre d'état « Restore unsaved work? » avec un bouton Restore. Le message passe facilement inaperçu, et sans clic le modèle reste de côté.
+- Fichiers : `src/lib/autosave.ts` (`pageWasReloaded` : l'entrée de navigation du navigateur dit « reload ») et son test ; `src/App.tsx` (après un rechargement, la sauvegarde utilisable est restaurée d'elle-même, une fois ; sinon la question reste).
+- Écarté : restaurer aussi à chaque nouvelle ouverture (la question garde son sens quand on revient des jours plus tard, ou quand un fichier est ouvert au démarrage).
+- Effet sur les projets : aucun ; le vrai enregistrement reste File > Save (.shz).
+- Confidentialité : non (tout reste dans le navigateur).
+- Vérification : 1 test (rechargement distingué d'une ouverture) ; vitest 1192 réussis, `tsc -b` et build propres. Niveau : testé (banc : 1 scénario). Non vérifié : un vrai rechargement dans Firefox chez JC.
