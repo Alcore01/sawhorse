@@ -63,8 +63,10 @@ export function annotationView(state: DocState | null, fmt: (m: number) => strin
       ],
       color,
       width: 1.25,
+      // Hidden where the solid is in front of it, like the guides (E-46).
+      depthTest: true,
     });
-    labels.push({ at: mul(add(a2, b2), 0.5), text: fmt(d.length), className: "dim" });
+    labels.push({ at: mul(add(a2, b2), 0.5), text: fmt(d.length), className: "dim", occlude: true });
   }
   return { overlay, labels };
 }

@@ -39,6 +39,8 @@ export interface Label {
   at: Vec3;
   text: string;
   className?: string;
+  /** Hide the label while a face is between the eye and `at` (stored dimensions, E-46). */
+  occlude?: boolean;
 }
 
 /** Window (left to right, solid) or crossing (right to left, dashed) selection rectangle. */
@@ -298,6 +300,7 @@ export function Viewport(props: ViewportProps) {
       </div>
       {engine
         ? (labels ?? []).map((l, i) => {
+            if (l.occlude && engine.occluded(l.at)) return null;
             const [x, y] = engine.worldToScreen(l.at);
             return (
               <div key={i} className={`vlabel ${l.className ?? ""}`} style={{ left: x, top: y }}>

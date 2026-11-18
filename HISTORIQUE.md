@@ -486,3 +486,15 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Fichiers : `src/tools/tape.test.ts` (`"endpoint" as const`).
 - Vérification : `tsc -b` et `npm run build` propres ; le test passe.
 - Leçon : la construction complète passe avant chaque envoi, pas après.
+
+## H-20261118-6 · correction · interface · Les cotes ne se voient plus à travers le solide (E-46)
+
+- Origine : JC (18 nov. 2026) : « on voit les cotations a travers le solide » (capture : cotes de l'arrière du bâtiment dessinées par-dessus les faces) ; E-46.
+- Constat : les lignes des cotes posées étaient dessinées sans test de profondeur (toujours par-dessus tout), contrairement aux guides ; leur texte est une étiquette HTML posée sur la vue, sans aucun test de masquage.
+- Fichiers : `src/lib/annotations.ts` (les lignes de cote avec `depthTest: true` ; l'étiquette marquée `occlude`) ; `src/components/Viewport.tsx` (`Label.occlude` : l'étiquette est cachée quand une face est entre l'œil et son point, par `engine.occluded`, déjà utilisé pour les extrémités visibles) ; `src/lib/annotations.test.ts` (2 scénarios).
+- Correction : une cote derrière le volume disparaît (lignes et texte) ; la cote en cours de pose avec l'outil Cotation reste visible par-dessus, pour qu'on voie ce qu'on fait.
+- Écarté : masquer aussi les cotes en cours de pose (on ne verrait plus la cote qu'on place derrière une face) ; dessiner les cotes cachées en pointillé (non demandé).
+- Effet sur les projets : aucun (seul l'affichage change).
+- Confidentialité : non.
+- Vérification : 2 scénarios qui échouent sans la correction et passent avec ; vitest 1195 réussis, `tsc -b` et `npm run build` propres avant l'envoi. Niveau : testé (banc : 2 scénarios). Non vérifié : à l'écran dans Firefox.
+- Limites connues : le texte se cache d'un coup quand son milieu passe derrière une face, alors que la ligne se cache au pixel près ; une cote posée exactement sur une face peut scintiller par endroits (même profondeur).
