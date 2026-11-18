@@ -469,3 +469,13 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Effet sur les projets : aucun ; le vrai enregistrement reste File > Save (.shz).
 - Confidentialité : non (tout reste dans le navigateur).
 - Vérification : 1 test (rechargement distingué d'une ouverture) ; vitest 1192 réussis, `tsc -b` et build propres. Niveau : testé (banc : 1 scénario). Non vérifié : un vrai rechargement dans Firefox chez JC.
+
+## H-20261118-4 · évolution · interface · Cote alignée sur la face source ou d'équerre à elle (E-45)
+
+- Origine : JC (18 nov. 2026, 13 h 55) : « pour la cotation possibilité d'aligner ou perpendiculaire a une des faces sources » (capture : une cote de 2,6983 m posée de travers sous un bâtiment, export natif .shz de GeoHVAC ouvert) ; E-45.
+- Constat : le décalage de la ligne de cote était la perpendiculaire de la cote au point visé, dans n'importe quelle direction ; un point visé sur le sol faisait partir la cote de biais.
+- Fichiers : `src/tools/tape.ts` (`offsetWays`, `snappedOffset` ; l'outil Cotation retient la normale des faces où ses points ont été pris) ; `src/tools/tape.test.ts` (1 scénario).
+- Évolution : le décalage s'accroche, à 20° près, à la direction dans le plan de la face source (la cote est posée sur la face, à côté de l'arête mesurée) ou d'équerre à elle (la cote sort de la face), puis au rouge, au vert ou au bleu ; la barre d'état dit laquelle. Hors de ces directions, il reste libre comme avant.
+- Effet sur les projets : aucun (les cotes existantes ne changent pas).
+- Vérification : 1 scénario (cote sur un pan de toit incliné : dans le plan du pan, puis d'équerre, chacun reconnu et exact) ; le test existant (décalage le long du vert) passe toujours ; vitest et build propres. Niveau : testé (banc : 1 scénario). Non vérifié : à la souris.
+- Limites connues : pour une arête cliquée, seule la face visée au clic est connue (pas sa voisine de l'autre côté de l'arête) ; pas encore de verrou par flèche.

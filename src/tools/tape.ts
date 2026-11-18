@@ -7,7 +7,10 @@
 // edges (the dado layout on a bookshelf side).
 //
 // Dimension: click two points (or one edge), then click where the dimension line goes.
-// The text is the length in the display units.
+// The text is the length in the display units. sketchcraft E-45: the line's offset snaps
+// (within 20°) to the plane of the faces the points were picked on (the line lies in the
+// face, beside the measured edge) or square to them (it stands out of the face), and to red,
+// green and blue; the status line says which.
 import type { V3 } from "../kernel/types";
 import { notHere, parseVcb } from "../lib/vcb";
 import { add, dist, dot, len, mul, sub, unit } from "./draw";
@@ -138,10 +141,67 @@ export class TapeTool extends StrokeTool {
   }
 }
 
+/** A direction the dimension line may stand off along, and how to say it. */
+interface OffsetWay {
+  dir: V3;
+  how: string;
+}
+
+const AXES: [V3, string][] = [
+  [[1, 0, 0], "along red"],
+  [[0, 1, 0], "along green"],
+  [[0, 0, 1], "along blue"],
+];
+
+function cross(a: V3, b: V3): V3 {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+
+/** sketchcraft E-45: the directions square to the span `a`-`b` a dimension line may stand off
+ * along: in each source face's plane and square to it, then the axes; parallel ones once. */
+export function offsetWays(a: V3, b: V3, normals: readonly V3[]): OffsetWay[] {
+  const d = unit(sub(b, a));
+  const ways: OffsetWay[] = [];
+  const add1 = (v: V3, how: string) => {
+    const w = sub(v, mul(d, dot(v, d)));
+    if (len(w) < 0.1) return;
+    const u = unit(w);
+    if (ways.some((x) => Math.abs(dot(x.dir, u)) > 1 - 1e-9)) return;
+    ways.push({ dir: u, how });
+  };
+  for (const n of normals) {
+    add1(cross(n, d), "in the face's plane");
+    add1(n, "square to the face");
+  }
+  for (const [axis, how] of AXES) add1(axis, how);
+  return ways;
+}
+
+/** The offset to `p` from the span `a`-`b`, snapped to the nearest of `ways` within 20°. */
+export function snappedOffset(a: V3, b: V3, p: V3, ways: readonly OffsetWay[]): { offset: V3; how: string | null } {
+  const raw = perpendicularFrom(a, b, p);
+  const l = len(raw);
+  if (l < 1e-12) return { offset: raw, how: null };
+  let best: OffsetWay | null = null;
+  let bestCos = Math.cos((20 * Math.PI) / 180);
+  for (const w of ways) {
+    const c = Math.abs(dot(raw, w.dir)) / l;
+    if (c >= bestCos) {
+      bestCos = c;
+      best = w;
+    }
+  }
+  if (!best) return { offset: raw, how: null };
+  return { offset: mul(best.dir, dot(raw, best.dir)), how: best.how };
+}
+
 export class DimensionTool extends StrokeTool {
   readonly id = "dim" as const;
   private a: V3 | null = null;
   private b: V3 | null = null;
+  /** sketchcraft E-45: the normals of the faces the points were picked on. */
+  private normals: V3[] = [];
+  private how: string | null = null;
 
   start(): V3 | null {
     return this.b ?? this.a;
@@ -151,17 +211,34 @@ export class DimensionTool extends StrokeTool {
     super.reset();
     this.a = null;
     this.b = null;
+    this.normals = [];
+    this.how = null;
+  }
+
+  private placed(c: V3): { offset: V3; how: string | null } {
+    const a = this.a as V3;
+    const b = this.b as V3;
+    return snappedOffset(a, b, c, offsetWays(a, b, this.normals));
   }
 
   onEvent(e: ToolEvent): void {
     const h = this.host;
     if (e.type === "move" || e.type === "drag") {
       this.track(e);
+      if (this.a && this.b && this.cursor) {
+        const { how } = this.placed(this.cursor);
+        if (how !== this.how) {
+          this.how = how;
+          h.status(how ? `Dimension line ${how}. Click to place it.` : "Click where the dimension line goes (it snaps to the faces' planes, square to them, and to the axes).");
+        }
+      }
       h.changed();
       return;
     }
     if (e.type !== "click" || !e.snap) return;
     const s = e.snap;
+    const n = e.picked?.surface?.frame.normal;
+    if (n && !this.b) this.normals.push(n);
     if (!this.a) {
       const edge = edgeOf(s);
       if (edge) {
@@ -183,7 +260,7 @@ export class DimensionTool extends StrokeTool {
     }
     const a = this.a;
     const b = this.b;
-    const offset = perpendicularFrom(a, b, s.point);
+    const { offset } = this.placed(s.point);
     this.reset();
     h.changed();
     void h.apply({ op: "add_dimension", a, b, offset }, () => `Dimension ${h.fmt(dist(a, b))} ${h.unitLabel()}.`);
@@ -194,7 +271,7 @@ export class DimensionTool extends StrokeTool {
     const c = this.cursor;
     if (!a || !c) return this.baseView();
     if (!this.b) return this.baseView([{ kind: "segments", points: [a, c], color: "--accent", width: 1.25, dashed: true }], this.live(this.host.fmt(dist(a, c))));
-    const off = perpendicularFrom(a, this.b, c);
+    const off = this.placed(c).offset;
     const a2 = add(a, off);
     const b2 = add(this.b, off);
     return this.baseView(

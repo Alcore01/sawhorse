@@ -78,4 +78,30 @@ describe("Dimension", () => {
     t.onEvent(ev("move", [1, 1, 0], { snapKind: "free" }));
     expect(t.view().labels[0].text).toBe(h.fmt(2));
   });
+
+  it("snaps the line into the source face's plane or square to it (sketchcraft E-45)", async () => {
+    // A roof pan rising towards +y: its normal leans back; the ridge-wise edge runs along x.
+    const n: V3 = [0, -0.6, 0.8];
+    const pan = { at: { kind: "face" as const, object: 1, face: 3 }, frame: { origin: [0, 0, 3] as V3, normal: n, u: [1, 0, 0] as V3, v: [0, 0.8, 0.6] as V3 }, point: [0, 0, 3] as V3, t: 9 };
+    const onPan = (p: V3) => ({ snapKind: "endpoint", picked: { entity: pan.at, point: p, surface: { ...pan, point: p } } });
+    const inPlane = async (cursor: V3) => {
+      const h = fakeHost();
+      const t = new DimensionTool(h);
+      t.onEvent(ev("click", [0, 0, 3], onPan([0, 0, 3])));
+      t.onEvent(ev("click", [4, 0, 3], onPan([4, 0, 3])));
+      t.onEvent(ev("move", cursor, { snapKind: "free" }));
+      const status = h.statuses.at(-1)?.text ?? "";
+      t.onEvent(ev("click", cursor, { snapKind: "free" }));
+      await tick();
+      return { off: last(h).offset as V3, status };
+    };
+    // Near the pan's own slope (0, 0.8, 0.6), a little off: it lies in the face.
+    let r = await inPlane([2, 1.0, 3.9]);
+    expect(r.status).toMatch(/in the face's plane/);
+    expect(r.off[1] * 0.6 - r.off[2] * 0.8).toBeCloseTo(0, 9); // parallel to (0, 0.8, 0.6)
+    // Near the normal, out of the roof: square to the face.
+    r = await inPlane([2, -0.55, 3.85]);
+    expect(r.status).toMatch(/square to the face/);
+    expect(r.off[1] * 0.8 + r.off[2] * 0.6).toBeCloseTo(0, 9); // parallel to (0, -0.6, 0.8)
+  });
 });
