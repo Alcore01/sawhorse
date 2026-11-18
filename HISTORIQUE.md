@@ -450,3 +450,12 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Effet sur les résultats : le bâtiment perd son orientation réelle de l'angle annoncé (utile plus tard pour le soleil et GeoHVAC) ; Annuler la lui rend.
 - Confidentialité : non (l'angle de 6° du bâtiment de JC a été estimé localement depuis le fichier joint).
 - Vérification : 3 tests (boîte tournée de 0, 17, −23, 40, 72, 110° : angle retrouvé à 90° près ; un petit mur de travers ne compte presque pas ; sans arête horizontale, rien ; centre du plan) ; vitest et build propres. Niveau : testé (banc : 3 scénarios). Non vérifié : dans l'application.
+
+## H-20261118-2 · correction · module · Unify : couture du toit à 5 cm (E-40)
+
+- Origine : JC (18 nov. 2026, 11 h 19) : « il ne veut pas unifier » (fichier `geohvac-batiment-a2cdd7e9.dae` joint) ; E-40.
+- Constat : le refus était « the rebuilt faces do not close a volume ». Deux morceaux du toit se rejoignent à un coin écarté de 5,59 − 5,56 m en plan, soit un rien plus de 3 cm en virgule flottante (0,030000000000000027) : la couture à 3 cm ne les joignait pas, les deux morceaux se croisaient en plan.
+- Fichiers : `crates/kernel/src/model.rs` (`UNIFY_GAP` 3 → 5 cm) ; `crates/kernel/tests/unify_mesh.rs` (1 scénario : un coin décalé d'un rien plus de 3 cm en travers ; il échoue à 3 cm avec le même message, passe à 5 cm).
+- Effet sur les résultats : des points de toit à moins de 5 cm sont confondus (sans effet sensible sur une volumétrie).
+- Vérification : le scénario ; essai local du fichier de JC : un solide étanche de 581,40 m³ (le volume sous les triangles du toit du fichier vaut 581,6 m³ ; plancher 176,6 m²), 25 faces après fusion automatique ; `cargo test --workspace` 765 réussis, clippy et fmt propres. Niveau : testé (banc : 1 scénario) et essayé sur le fichier réel hors de l'application.
+- Suite : la cause est à l'export de GeoHVAC (morceaux non cousus) ; note explicative demandée par JC pour « Profondeur Alpha » (11 h 30).

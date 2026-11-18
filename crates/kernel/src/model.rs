@@ -5318,8 +5318,8 @@ fn auto_merged(o: &Object) -> (Object, u64) {
 }
 
 /// sketchcraft E-40: how far apart (metres) the pieces of an imported roof may be and still
-/// be sewn together (GeoHVAC's are 1 to 2 cm apart).
-pub const UNIFY_GAP: f64 = 0.03;
+/// be sewn together (GeoHVAC's are 1 to 4 cm apart: 3 cm left building A2CDD7E9 open).
+pub const UNIFY_GAP: f64 = 0.05;
 
 /// sketchcraft E-41: how far (metres) faces may lie out of one plane and still be merged.
 pub const MERGE_TOLERANCE: f64 = 0.05;

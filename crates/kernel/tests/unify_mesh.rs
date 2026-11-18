@@ -252,3 +252,32 @@ fn faces_far_out_of_one_plane_are_not_merged() {
     assert!(err.to_string().contains("out of one plane"), "{err}");
     assert_eq!(m.hash(), h);
 }
+
+#[test]
+fn roof_pieces_a_little_over_3_cm_apart_are_sewn_too() {
+    // GeoHVAC's building A2CDD7E9 (18 nov. 2026): two roof pieces whose shared corner is
+    // 3.0006 cm apart were left unsewn at a 3 cm gap: "do not close a volume".
+    let it = item(
+        vec![
+            [0.0, 0.0, 3.0],
+            [4.0, 0.0, 3.0],
+            [4.0, 4.0, 3.0],
+            // its corner a hair over 3 cm off, across: the two pieces cross in plan
+            [0.0, -0.0300001, 3.0006],
+            [4.0, 4.0, 3.0],
+            [0.0, 4.0, 3.0],
+            [0.0, 0.0, 0.0],
+            [4.0, 0.0, 0.0],
+        ],
+        &[[0, 1, 2], [3, 4, 5], [6, 7, 1], [6, 1, 0]],
+    );
+    let mut m = imported(it);
+    let mesh = m.meshes()[0].0;
+    m.apply(&Op::UnifyMesh { mesh }).unwrap();
+    assert!(m.stats().watertight);
+    assert!(
+        (m.stats().volume_m3 - 48.0).abs() < 0.05,
+        "{}",
+        m.stats().volume_m3
+    );
+}
