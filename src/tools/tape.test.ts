@@ -83,7 +83,7 @@ describe("Dimension", () => {
     // A roof pan rising towards +y: its normal leans back; the ridge-wise edge runs along x.
     const n: V3 = [0, -0.6, 0.8];
     const pan = { at: { kind: "face" as const, object: 1, face: 3 }, frame: { origin: [0, 0, 3] as V3, normal: n, u: [1, 0, 0] as V3, v: [0, 0.8, 0.6] as V3 }, point: [0, 0, 3] as V3, t: 9 };
-    const onPan = (p: V3) => ({ snapKind: "endpoint", picked: { entity: pan.at, point: p, surface: { ...pan, point: p } } });
+    const onPan = (p: V3) => ({ snapKind: "endpoint" as const, picked: { entity: pan.at, point: p, surface: { ...pan, point: p } } });
     const inPlane = async (cursor: V3) => {
       const h = fakeHost();
       const t = new DimensionTool(h);

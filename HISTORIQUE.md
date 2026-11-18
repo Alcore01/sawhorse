@@ -479,3 +479,10 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Effet sur les projets : aucun (les cotes existantes ne changent pas).
 - Vérification : 1 scénario (cote sur un pan de toit incliné : dans le plan du pan, puis d'équerre, chacun reconnu et exact) ; le test existant (décalage le long du vert) passe toujours ; vitest et build propres. Niveau : testé (banc : 1 scénario). Non vérifié : à la souris.
 - Limites connues : pour une arête cliquée, seule la face visée au clic est connue (pas sa voisine de l'autre côté de l'arête) ; pas encore de verrou par flèche.
+
+## H-20261118-5 · rectification · interface · H-20261118-4 : le test cassait la compilation
+
+- Origine : constat de Claude juste après H-20261118-4 : `npm run build` (qui compile aussi les tests, `tsc -b`) refusait `snapKind: "endpoint"` (une chaîne au lieu du type `InferenceKind`) ; vitest, lui, passait. Le commit 60e4aeb a été poussé avant la vérification complète : le fork n'a pas compilé pendant quelques minutes.
+- Fichiers : `src/tools/tape.test.ts` (`"endpoint" as const`).
+- Vérification : `tsc -b` et `npm run build` propres ; le test passe.
+- Leçon : la construction complète passe avant chaque envoi, pas après.
