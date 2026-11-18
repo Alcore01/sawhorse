@@ -1475,7 +1475,7 @@ fn import_budget(
 }
 
 /// A usable name from a file: trimmed, at most 64 characters, `fallback` when empty.
-fn clip_name(n: &str, fallback: &str) -> String {
+pub(crate) fn clip_name(n: &str, fallback: &str) -> String {
     let t: String = n.trim().chars().take(64).collect();
     let t = t.trim().to_string();
     if t.is_empty() {

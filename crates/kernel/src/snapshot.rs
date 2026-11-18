@@ -1587,7 +1587,9 @@ impl Model {
                     .collect();
                 if !objects.is_empty() {
                     let k = m.nodes.insert(Node {
-                        name: Some(g.name.clone()),
+                        // Not checked with the other names (lane 16): clipped like a name
+                        // from an imported file, so the model saves again (E-47).
+                        name: Some(crate::model::clip_name(&g.name, "Group")),
                         kind: NodeKind::Group,
                         xform: Xform::IDENTITY,
                         tag: None,

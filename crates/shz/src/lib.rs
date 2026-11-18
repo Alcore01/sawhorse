@@ -780,6 +780,26 @@ mod tests {
     }
 
     #[test]
+    fn a_long_flat_group_name_is_clipped_so_the_file_saves_again() {
+        // E-47: GeoHVAC's native export names its group "GeoHVAC · bâtiment …" with more
+        // than 64 characters in `groups`; the file opened, then Save refused it.
+        let d = sample();
+        let mut snap = d.model().snapshot();
+        snap.nodes.clear();
+        for o in &mut snap.objects {
+            o.parent = None;
+        }
+        let long = format!("GeoHVAC · bâtiment A2CDD7E9 · {}", "é".repeat(60));
+        snap.groups[0].name = long.clone();
+        let m = sawhorse_kernel::Model::from_snapshot(&snap).unwrap();
+        let name = m.groups()[0].1.name.clone();
+        assert_eq!(name.chars().count(), 64);
+        assert!(long.starts_with(&name));
+        let back = read(&write(&m, &SaveOptions::default()).unwrap()).unwrap();
+        assert_eq!(back.document.model().groups()[0].1.name, name);
+    }
+
+    #[test]
     fn refusals() {
         assert!(matches!(read(b"not a zip"), Err(ShzError::NotShz(_))));
         let d = sample();

@@ -498,3 +498,15 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 2 scénarios qui échouent sans la correction et passent avec ; vitest 1195 réussis, `tsc -b` et `npm run build` propres avant l'envoi. Niveau : testé (banc : 2 scénarios). Non vérifié : à l'écran dans Firefox.
 - Limites connues : le texte se cache d'un coup quand son milieu passe derrière une face, alors que la ligne se cache au pixel près ; une cote posée exactement sur une face peut scintiller par endroits (même profondeur).
+
+## H-20261118-7 · correction · module · Enregistrement refusé après ouverture d'un .shz de GeoHVAC (E-47)
+
+- Origine : JC (18 nov. 2026, 22 h 19) : « c'est embêtant on ne sais pas sauvegarder » (capture : « Could not save: the saved copy would not have opened (… a group or instance: a name longer than 64 characters) ») ; E-47.
+- Constat : le format garde deux façons de décrire un groupe ; l'ancienne liste `groups`, celle que la notice proposait à Profondeur Alpha, n'avait pas de contrôle de longueur des noms à l'ouverture, alors que la nouvelle (`nodes`), seule écrite à l'enregistrement, en a un. L'export natif de GeoHVAC nomme son groupe « GeoHVAC · bâtiment … » avec plus de 64 caractères : le fichier s'ouvrait, puis l'enregistrement refusait le nom.
+- Fichiers : `crates/kernel/src/snapshot.rs` (le nom d'un groupe de l'ancienne liste est coupé à 64 caractères, « Group » s'il est vide) ; `crates/kernel/src/model.rs` (`clip_name` rendu visible dans le noyau) ; `crates/shz/src/lib.rs` (1 scénario).
+- Correction : le nom trop long est coupé à 64 caractères à l'ouverture, comme pour un import ; l'enregistrement passe.
+- Écarté : refuser le fichier à l'ouverture (le modèle de GeoHVAC ne s'ouvrirait plus) ; relever la limite (elle vaut pour tout le format).
+- Effet sur les projets : le nom du groupe est raccourci au premier enregistrement ; rien d'autre ne change.
+- Confidentialité : non.
+- Vérification : 1 scénario (nom de 90 caractères : ouvert, coupé à 64, enregistré puis relu) qui échoue sans la correction ; cargo 766 réussis, clippy et fmt propres ; vitest 1195, `tsc -b` et build propres. Niveau : testé (banc : 1 scénario). Non vérifié : avec le vrai fichier de GeoHVAC (pas reçu ici).
+- Limites connues : demande de reconstruire le noyau (`npm run wasm`).
