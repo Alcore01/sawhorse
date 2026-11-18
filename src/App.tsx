@@ -70,6 +70,8 @@ import type { ExportOptions, ImportUnit, OpOutcome } from "./kernel/types";
 import { ImportReport, type Report } from "./components/ImportReport";
 import { NameDialog, type NameRequest } from "./components/NameDialog";
 import { parseAlong } from "./lib/extrudeAlong";
+import { planCentre, solidEdges, wallAngle } from "./lib/align";
+import { rotation } from "./tools/xform";
 import { APP_NAME } from "./lib/brand";
 import { KeyBar } from "./components/KeyBar";
 import { SceneTabs } from "./components/SceneTabs";
@@ -1994,6 +1996,25 @@ export function App() {
     });
   }, [apply]);
 
+  /** sketchcraft E-43: Edit > Align to Axes: the selected solids (all of them when none is
+   * selected) turned about blue, about their plan's centre, so their walls run along red and
+   * green; one undo step. */
+  const alignToAxes = useCallback(async () => {
+    const mesh = live.current.scene?.mesh;
+    const st0 = live.current.scene?.state;
+    if (!mesh || !st0) return;
+    const picked = live.current.selection.flatMap((x) => (x.kind === "object" || x.kind === "face" ? [x.object] : []));
+    const objects = [...new Set(picked.length ? picked : [...(st0.objects ?? [])])];
+    if (!objects.length) return void setMessage({ text: "There is no solid to line up (Unify Imported Meshes first for an imported building).", error: true });
+    const edges = solidEdges(mesh, new Set(objects));
+    const a = wallAngle(edges);
+    if (a === null) return void setMessage({ text: "No level edge to line up with.", error: true });
+    const deg = (a * 180) / Math.PI;
+    if (Math.abs(deg) < 0.005) return void setMessage({ text: "Already lined up with red and green.", error: false });
+    const xform = rotation(planCentre(edges), [0, 0, 1], -a);
+    await apply({ op: "transform", objects, xform }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the walls run along red and green. Its real orientation is ${deg.toFixed(2)}° from this (north for the sun and shadows); Undo turns it back.`);
+  }, [apply]);
+
   /** sketchcraft E-40: Edit > Unify Imported Meshes: each imported mesh, one undo step
    * each, rebuilt as a solid from its roof; what each became, or why not, in a report. */
   const unifyMeshes = useCallback(async () => {
@@ -3106,6 +3127,12 @@ export function App() {
           onSelect: () => void mergeFaces(),
         },
         {
+          label: "Align to Axes",
+          title: "sketchcraft: turn the selected solids (all of them when none is selected) about blue so their walls run along red and green",
+          disabled: !(st?.stats.objects ?? 0),
+          onSelect: () => void alignToAxes(),
+        },
+        {
           label: "Auto Merge Faces",
           title: "sketchcraft: in the selected solid, every group of faces side by side and nearly in one plane (within 5° and 5 cm) made one face",
           disabled: !selection.some((x) => x.kind === "object" || x.kind === "face"),
@@ -3212,7 +3239,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;

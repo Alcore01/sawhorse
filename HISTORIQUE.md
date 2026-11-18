@@ -440,3 +440,13 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non (essai local sur le fichier de JC, copie dérivée effacée ensuite).
 - Vérification : 3 scénarios (toit en deux triangles décalés de 2 cm : une face de toit après Unify, 6 faces, étanche ; dessus coupé en deux fusionné par Merge Faces ; trouvé seul par Auto Merge, rien d'autre ne change, un second passage ne change rien) ; essai local du fichier de JC : 26 → 20 faces, étanche. `cargo test --workspace` 764 réussis, clippy et fmt propres ; vitest 1188 réussis ; build propre. Niveau : testé (banc : 3 scénarios). Non vérifié : dans l’application chez JC.
 - Limites connues : seuils fixes (5°, 5 cm) ; des pans séparés par plus de 5° restent distincts (c'est voulu : ce sont de vrais pans).
+
+## H-20261118-1 · évolution · interface · Align to Axes : un bâtiment de travers aligné sur le rouge et le vert (E-43)
+
+- Origine : JC (18 nov. 2026, 10 h 24) : « je ne sais pas comment aligner automatiquement le batiment importé dans la vue de volume craft » (capture : le bâtiment unifié de travers, outil Rotation ouvert) ; E-43.
+- Fichiers : `src/lib/align.ts` (nouveau : arêtes des solides choisis dans le maillage affiché ; direction des murs par vote des arêtes horizontales, chacune selon sa longueur, sur 4 × leur angle, donc à 90° près ; centre du plan) et son test ; `src/App.tsx` (Édition > Align to Axes : les solides choisis, ou tous si rien n'est choisi, tournés autour du bleu par le centre de leur plan, une étape d'annulation ; le message donne l'angle).
+- Évolution : une commande au lieu de chercher l'angle à la main avec l'outil Rotation. Le noyau n'a pas changé (op `transform` existante).
+- Écarté : tourner les axes de dessin plutôt que le bâtiment (E-02, pas encore fait) ; ce serait mieux pour garder le nord : à reprendre.
+- Effet sur les résultats : le bâtiment perd son orientation réelle de l'angle annoncé (utile plus tard pour le soleil et GeoHVAC) ; Annuler la lui rend.
+- Confidentialité : non (l'angle de 6° du bâtiment de JC a été estimé localement depuis le fichier joint).
+- Vérification : 3 tests (boîte tournée de 0, 17, −23, 40, 72, 110° : angle retrouvé à 90° près ; un petit mur de travers ne compte presque pas ; sans arête horizontale, rien ; centre du plan) ; vitest et build propres. Niveau : testé (banc : 3 scénarios). Non vérifié : dans l'application.
