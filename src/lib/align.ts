@@ -52,3 +52,17 @@ export function planCentre(edges: readonly [V3, V3][]): V3 {
     }
   return [(x0 + x1) / 2, (y0 + y1) / 2, Number.isFinite(z0) ? z0 : 0];
 }
+
+/** sketchcraft E-48: the turn (radians, in (-45°, 45°]) that lines a façade up: its normal,
+ * flattened onto the ground, measured from red modulo 90°, so turning by minus this makes the
+ * façade face the nearest of red and green (either way). Null for a face that is nearly level
+ * (a roof or floor has no façade direction). */
+export function facadeAngle(normal: V3): number | null {
+  const h = Math.hypot(normal[0], normal[1]);
+  if (h < 0.2 * Math.hypot(normal[0], normal[1], normal[2])) return null;
+  let a = Math.atan2(normal[1], normal[0]);
+  const q = Math.PI / 2;
+  a -= q * Math.round(a / q);
+  if (a <= -Math.PI / 4 + 1e-12) a += q;
+  return a;
+}

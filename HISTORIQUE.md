@@ -510,3 +510,13 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 1 scénario (nom de 90 caractères : ouvert, coupé à 64, enregistré puis relu) qui échoue sans la correction ; cargo 766 réussis, clippy et fmt propres ; vitest 1195, `tsc -b` et build propres. Niveau : testé (banc : 1 scénario). Non vérifié : avec le vrai fichier de GeoHVAC (pas reçu ici).
 - Limites connues : demande de reconstruire le noyau (`npm run wasm`).
+
+## H-20261119-1 · évolution · interface · Aligner le bâtiment d'après la façade sélectionnée (E-48)
+
+- Origine : JC (19 nov. 2026, 12 h 20) : « il manque la possibilité d'aligner un bâtiment sur un axe en utilisant la façade selectionnée » (capture : bâtiment 740C7886, 706,2 m³, posé de biais) ; E-48.
+- Fichiers : `src/lib/align.ts` (`facadeAngle` : direction horizontale de la normale de la face, modulo 90°) ; `src/lib/align.test.ts` (4 scénarios) ; `src/App.tsx` (Edit > Align Façade to Axes, actif quand une seule face est sélectionnée).
+- Évolution : on sélectionne une façade (double-clic dans le bâtiment, puis clic sur le mur), puis Edit > Align Façade to Axes. Le solide tourne autour du bleu, sur place, jusqu'à ce que la façade fasse face au rouge ou au vert, le plus proche des deux ; les autres solides sélectionnés tournent avec lui. La barre d'état dit l'angle et l'orientation réelle (pour le nord). Un toit ou un plancher est refusé.
+- Écarté : laisser choisir l'axe (rouge ou vert) et le sens : un second tour de 90° avec Rotate le fait déjà ; changer Align to Axes (son sens actuel, les murs les plus longs, reste utile).
+- Effet sur les projets : aucun en dehors de l'opération ; Undo la défait.
+- Confidentialité : non.
+- Vérification : 4 scénarios (façade à 20°, chemin le plus court vers le vert, façade qui l'emporte sur les murs longs, mur incliné accepté et toit refusé) ; vitest 1199, `tsc -b` et build propres. Niveau : testé (banc : 4 scénarios). Non vérifié : à la souris dans Firefox ; le cas d'un groupe lui-même tourné (comme Align to Axes).

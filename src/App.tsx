@@ -70,7 +70,7 @@ import type { ExportOptions, ImportUnit, OpOutcome } from "./kernel/types";
 import { ImportReport, type Report } from "./components/ImportReport";
 import { NameDialog, type NameRequest } from "./components/NameDialog";
 import { parseAlong } from "./lib/extrudeAlong";
-import { planCentre, solidEdges, wallAngle } from "./lib/align";
+import { facadeAngle, planCentre, solidEdges, wallAngle } from "./lib/align";
 import { rotation } from "./tools/xform";
 import { APP_NAME } from "./lib/brand";
 import { KeyBar } from "./components/KeyBar";
@@ -2022,6 +2022,26 @@ export function App() {
     await apply({ op: "transform", objects, xform }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the walls run along red and green. Its real orientation is ${deg.toFixed(2)}° from this (north for the sun and shadows); Undo turns it back.`);
   }, [apply]);
 
+  /** sketchcraft E-48: Edit > Align Façade to Axes: the selected façade (one face) turned
+   * about blue so it faces the nearest of red and green, its whole solid with it (and the other
+   * selected solids); one undo step. */
+  const alignFacade = useCallback(async () => {
+    const mesh = live.current.scene?.mesh;
+    const sel = live.current.selection;
+    const faces = sel.flatMap((x) => (x.kind === "face" ? [x] : []));
+    if (!mesh || faces.length !== 1) return void setMessage({ text: "Select one façade (a wall face) first: double-click the building, then click the wall.", error: true });
+    const f = faces[0];
+    const part = mesh.parts.find((p) => p.kind === "face" && p.owner === f.object && p.index === f.face);
+    if (!part) return void setMessage({ text: "That face is not in view.", error: true });
+    const a = facadeAngle(part.normal);
+    if (a === null) return void setMessage({ text: "That face is level (a roof or floor): pick a wall.", error: true });
+    const objects = [...new Set([f.object, ...sel.flatMap((x) => (x.kind === "object" ? [x.object] : []))])];
+    const deg = (a * 180) / Math.PI;
+    if (Math.abs(deg) < 0.005) return void setMessage({ text: "That façade already faces along red or green.", error: false });
+    const xform = rotation(planCentre(solidEdges(mesh, new Set(objects))), [0, 0, 1], -a);
+    await apply({ op: "transform", objects, xform }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the selected façade faces along ${Math.abs(Math.cos(Math.atan2(part.normal[1], part.normal[0]) - a)) > 0.7 ? "red" : "green"}. Its real orientation is ${deg.toFixed(2)}° from this (north for the sun and shadows); Undo turns it back.`);
+  }, [apply]);
+
   /** sketchcraft E-40: Edit > Unify Imported Meshes: each imported mesh, one undo step
    * each, rebuilt as a solid from its roof; what each became, or why not, in a report. */
   const unifyMeshes = useCallback(async () => {
@@ -3140,6 +3160,12 @@ export function App() {
           onSelect: () => void alignToAxes(),
         },
         {
+          label: "Align Façade to Axes",
+          title: "sketchcraft: turn the building about blue so the selected façade (one wall face) faces along red or green, whichever is nearer",
+          disabled: selection.filter((x) => x.kind === "face").length !== 1,
+          onSelect: () => void alignFacade(),
+        },
+        {
           label: "Auto Merge Faces",
           title: "sketchcraft: in the selected solid, every group of faces side by side and nearly in one plane (within 5° and 5 cm) made one face",
           disabled: !selection.some((x) => x.kind === "object" || x.kind === "face"),
@@ -3246,7 +3272,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, alignFacade, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;

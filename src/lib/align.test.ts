@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { V3 } from "../kernel/types";
-import { planCentre, wallAngle } from "./align";
+import { facadeAngle, planCentre, wallAngle } from "./align";
 
 /** A w x d box's level edges (floor and roof outline), turned by `a` about the origin. */
 function box(w: number, d: number, a: number): [V3, V3][] {
@@ -32,5 +32,32 @@ describe("Align to Axes (sketchcraft E-43)", () => {
   it("has nothing to go by without level edges, and centres on the plan", () => {
     expect(wallAngle([[[0, 0, 0], [0, 0, 3]]])).toBeNull();
     expect(planCentre(box(4, 2, 0))).toEqual([2, 1, 0]);
+  });
+});
+
+describe("Align Façade to Axes (sketchcraft E-48)", () => {
+  const deg = (r: number | null) => (r === null ? null : (r * 180) / Math.PI);
+  const n = (d: number, z = 0): V3 => [Math.cos((d * Math.PI) / 180), Math.sin((d * Math.PI) / 180), z];
+
+  it("turns a façade askew by 20° so it faces red", () => {
+    expect(deg(facadeAngle(n(20)))).toBeCloseTo(20, 9);
+    expect(deg(facadeAngle(n(200)))).toBeCloseTo(20, 9);
+  });
+
+  it("goes the short way, to green when that is nearer", () => {
+    expect(deg(facadeAngle(n(110)))).toBeCloseTo(20, 9);
+    expect(deg(facadeAngle(n(-70)))).toBeCloseTo(20, 9);
+    expect(deg(facadeAngle(n(60)))).toBeCloseTo(-30, 9);
+  });
+
+  it("follows the chosen façade, not the longest walls", () => {
+    // A façade at 33° in a building whose long walls run at 10°: the façade decides.
+    expect(deg(facadeAngle(n(33)))).toBeCloseTo(33, 9);
+  });
+
+  it("works on a leaning wall but refuses a roof or floor", () => {
+    expect(deg(facadeAngle(n(15, 0.5)))).toBeCloseTo(15, 9);
+    expect(facadeAngle([0, 0, 1])).toBeNull();
+    expect(facadeAngle([0.05, 0, -1])).toBeNull();
   });
 });
