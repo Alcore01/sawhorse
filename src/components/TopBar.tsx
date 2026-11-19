@@ -4,7 +4,7 @@ import { APP_CREDIT, APP_NAME } from "../lib/brand";
 import { BAR_VIEWS, type ViewId } from "../viewport/camera";
 
 // "Plugins" (lane 11) sits after Tools: commands from enabled plugins, and managing them.
-const MENUS = ["File", "Edit", "View", "Draw", "Tools", "Plugins", "Window", "Help"];
+const MENUS = ["File", "Edit", "Volume", "View", "Draw", "Tools", "Plugins", "Window", "Help"];
 
 /** One entry in a drop-down menu ("-" is a separator; `items` opens a submenu). */
 export type MenuItem =

@@ -27,7 +27,7 @@ import { useRenderGate } from "./credits/gate";
 import { SettingsDialog } from "./components/SettingsDialog";
 import type { DocState, Entity, KernelOp, MeshData, SceneData, V3 } from "./kernel/types";
 import { describeTarget, nextTarget, type Target } from "./lib/edit";
-import { entityKey, eraseOps, partsOf, selectionHighlight, selectionLookup, withHover } from "./lib/entities";
+import { entityKey, erasedWords, eraseOps, partsOf, selectionHighlight, selectionLookup, withHover } from "./lib/entities";
 import { thumbnailUrl } from "./lib/thumbnail";
 import { contextTrail, describeNode, entityShown, graphIndex, graphOf, nodeById, objectParent, quoted, scopeEntity, solidsIn } from "./lib/scope";
 import { meshIndex } from "./lib/meshIndex";
@@ -1876,7 +1876,7 @@ export function App() {
       return;
     }
     const op: KernelOp = ops.length === 1 ? ops[0] : { op: "batch", ops };
-    void apply(op, () => `Erased ${ops.length} item${ops.length === 1 ? "" : "s"}${skipped.length ? ` (${skipped.length} skipped: ${skipped[0]})` : ""}.`).then((r) => {
+    void apply(op, (res) => `${erasedWords(res.outcome, sel.length).replace(/\.$/, "")}${skipped.length ? ` (${skipped.length} skipped: ${skipped[0]})` : ""}.`).then((r) => {
       if (r) {
         live.current.selection = [];
         setSelection([]);
@@ -1960,7 +1960,7 @@ export function App() {
     [apply, inContext, parentOfItem, select],
   );
 
-  /** sketchcraft E-28: Edit > Explode Solid into Faces: each selected solid becomes plain
+  /** sketchcraft E-28: Volume > Explode Solid into Faces: each selected solid becomes plain
    * faces (its volume goes); a face then goes with Select + Delete. One undo step. */
   const explodeSolids = useCallback(async () => {
     const objects = live.current.selection.flatMap((x) => (x.kind === "object" ? [x.object] : []));
@@ -1969,7 +1969,7 @@ export function App() {
     const r = await apply(ops.length === 1 ? ops[0] : { op: "batch", ops }, (r) => {
       const outs = r.outcome.kind === "batch" ? r.outcome.outcomes : [r.outcome];
       const n = outs.reduce((a, o) => a + (o.kind === "solid_exploded" ? o.face_count : 0), 0);
-      return `Exploded into ${plural(n, "face")}: select one and press Delete to remove it; Edit > Make Solid from Faces closes them again.`;
+      return `Exploded into ${plural(n, "face")}: select one and press Delete to remove it; Volume > Make Solid from Faces closes them again.`;
     });
     if (r) {
       live.current.selection = [];
@@ -1977,7 +1977,7 @@ export function App() {
     }
   }, [apply]);
 
-  /** sketchcraft E-28: Edit > Make Solid from Faces: the selected faces, closing a volume,
+  /** sketchcraft E-28: Volume > Make Solid from Faces: the selected faces, closing a volume,
    * become one solid. */
   const solidFromFaces = useCallback(async () => {
     const faces = live.current.selection.flatMap((x) => (x.kind === "region" ? [[x.sketch, x.region] as [number, number]] : []));
@@ -1986,7 +1986,7 @@ export function App() {
     if (r?.outcome.kind === "object_created") select([{ kind: "object", object: r.outcome.object }]);
   }, [apply, select]);
 
-  /** sketchcraft E-41: Edit > Merge Faces: the selected faces of one solid, side by side and
+  /** sketchcraft E-41: Volume > Merge Faces: the selected faces of one solid, side by side and
    * nearly in one plane (5 cm), made one flat face; the edges between them go. */
   const mergeFaces = useCallback(async () => {
     const faces = live.current.selection.flatMap((x) => (x.kind === "face" ? [x] : []));
@@ -1996,7 +1996,7 @@ export function App() {
     if (r?.outcome.kind === "faces_merged") select([{ kind: "face", object: objects[0], face: r.outcome.face }]);
   }, [apply, select]);
 
-  /** sketchcraft E-42: Edit > Auto Merge Faces: in each selected solid, every group of faces
+  /** sketchcraft E-42: Volume > Auto Merge Faces: in each selected solid, every group of faces
    * side by side and nearly in one plane (5°, 5 cm) made one face; one undo step. */
   const autoMergeFaces = useCallback(async () => {
     const sel = live.current.selection;
@@ -2010,7 +2010,7 @@ export function App() {
     });
   }, [apply]);
 
-  /** sketchcraft E-43: Edit > Align to Axes: the selected solids (all of them when none is
+  /** sketchcraft E-43: Volume > Align to Axes: the selected solids (all of them when none is
    * selected) turned about blue, about their plan's centre, so their walls run along red and
    * green; one undo step. */
   const alignToAxes = useCallback(async () => {
@@ -2029,7 +2029,7 @@ export function App() {
     await apply({ op: "transform", objects, xform }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the walls run along red and green. Its real orientation is ${deg.toFixed(2)}° from this (north for the sun and shadows); Undo turns it back.`);
   }, [apply]);
 
-  /** sketchcraft E-50: Edit > Clean Up Points: in the selected solids and sketches (all of
+  /** sketchcraft E-50: Volume > Clean Up Points: in the selected solids and sketches (all of
    * them when nothing is selected), every point between two edges nearly in line (within
    * 5 cm) removed; one undo step. */
   const cleanPoints = useCallback(async () => {
@@ -2078,7 +2078,7 @@ export function App() {
     [apply],
   );
 
-  /** sketchcraft E-48: Edit > Align Façade to Axes: the selected façade (one face) turned
+  /** sketchcraft E-48: Volume > Align Façade to Axes: the selected façade (one face) turned
    * about blue so it faces the nearest of red and green, its whole solid with it (and the other
    * selected solids); one undo step. */
   const alignFacade = useCallback(async () => {
@@ -2098,7 +2098,7 @@ export function App() {
     await apply({ op: "transform", objects, xform }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the selected façade faces along ${Math.abs(Math.cos(Math.atan2(part.normal[1], part.normal[0]) - a)) > 0.7 ? "red" : "green"}. Its real orientation is ${deg.toFixed(2)}° from this (north for the sun and shadows); Undo turns it back.`);
   }, [apply]);
 
-  /** sketchcraft E-40: Edit > Unify Imported Meshes: each imported mesh, one undo step
+  /** sketchcraft E-40: Volume > Unify Imported Meshes: each imported mesh, one undo step
    * each, rebuilt as a solid from its roof; what each became, or why not, in a report. */
   const unifyMeshes = useCallback(async () => {
     const meshes = live.current.scene?.state.meshes ?? [];
@@ -2117,7 +2117,7 @@ export function App() {
     setReport({ title: `Unified ${made.length} of ${plural(meshes.length, "imported mesh")}`, lines, error: made.length < meshes.length });
   }, [apply, select]);
 
-  /** sketchcraft E-04: Edit > Join Solids: the selected solids, touching or overlapping,
+  /** sketchcraft E-04: Volume > Join Solids: the selected solids, touching or overlapping,
    * become one (a roof slab joined to its house). */
   const joinSolids = useCallback(async () => {
     const objects = live.current.selection.flatMap((x) => (x.kind === "object" ? [x.object] : []));
@@ -2126,7 +2126,7 @@ export function App() {
     if (r?.outcome.kind === "object_created") select([{ kind: "object", object: r.outcome.object }]);
   }, [apply, select]);
 
-  /** sketchcraft E-30: Edit > Extrude Faces Along Axis: the selected faces, together, along
+  /** sketchcraft E-30: Volume > Extrude Faces Along Axis: the selected faces, together, along
    * blue (or a typed axis) into one solid; the faces stay. */
   const extrudeAlong = useCallback(() => {
     const faces = live.current.selection.flatMap((x) => (x.kind === "region" ? [[x.sketch, x.region] as [number, number]] : []));
@@ -3160,30 +3160,6 @@ export function App() {
         },
         { label: "Explode", keys: "Ctrl+Shift+G", disabled: !selection.some((x) => x.kind === "node"), onSelect: () => void explode(selection.flatMap((x) => (x.kind === "node" ? [x.node] : []))) },
         {
-          label: "Explode Solid into Faces",
-          title: "sketchcraft: each selected solid becomes plain faces (its volume goes); then Select + Delete removes a face",
-          disabled: !selection.some((x) => x.kind === "object"),
-          onSelect: () => void explodeSolids(),
-        },
-        {
-          label: "Join Solids",
-          title: "sketchcraft: the selected solids, touching or overlapping, become one (union)",
-          disabled: selection.filter((x) => x.kind === "object").length < 2,
-          onSelect: () => void joinSolids(),
-        },
-        {
-          label: "Extrude Faces Along Axis…",
-          title: "sketchcraft: the selected faces extruded together along an axis (blue by default) into one solid, e.g. a roof slab",
-          disabled: !selection.some((x) => x.kind === "region"),
-          onSelect: extrudeAlong,
-        },
-        {
-          label: "Make Solid from Faces",
-          title: "sketchcraft: the selected faces, if they close a volume, become one solid",
-          disabled: selection.filter((x) => x.kind === "region").length < 4,
-          onSelect: () => void solidFromFaces(),
-        },
-        {
           label: "Explode Curve",
           title: "The selected circles, arcs, polygons and curves become plain edges, each segment its own again; one undo step",
           disabled: !selection.some((x) => x.kind === "curve"),
@@ -3206,51 +3182,6 @@ export function App() {
           disabled: (st?.graph?.context ?? null) === null,
           onSelect: () => void apply({ op: "leave_context" }, (r) => `Closed it. Editing ${contextTrail(r.scene.state.graph)}.`),
         },
-        {
-          label: "Merge Faces",
-          title: "sketchcraft: the selected faces of one solid, side by side and nearly in one plane (within 5 cm), made one flat face: the edges between them go",
-          disabled: selection.filter((x) => x.kind === "face").length < 2,
-          onSelect: () => void mergeFaces(),
-        },
-        {
-          label: "Align to Axes",
-          title: "sketchcraft: turn the selected solids (all of them when none is selected) about blue so their walls run along red and green",
-          disabled: !(st?.stats.objects ?? 0),
-          onSelect: () => void alignToAxes(),
-        },
-        {
-          label: "Clean Up Points",
-          title: "sketchcraft: in the selected solids and faces (everything when nothing is selected), remove every point between two edges nearly in line (within 5 cm); Delete removes one selected point",
-          disabled: !(st?.stats.objects ?? 0) && !(st?.sketches?.length ?? 0),
-          onSelect: () => void cleanPoints(),
-        },
-        {
-          label: "Align Façade to Axes",
-          title: "sketchcraft: turn the building about blue so the selected façade (one wall face) faces along red or green, whichever is nearer",
-          disabled: selection.filter((x) => x.kind === "face").length !== 1,
-          onSelect: () => void alignFacade(),
-        },
-        {
-          label: "Auto Merge Faces",
-          title: "sketchcraft: in the selected solid, every group of faces side by side and nearly in one plane (within 5° and 5 cm) made one face",
-          disabled: !selection.some((x) => x.kind === "object" || x.kind === "face"),
-          onSelect: () => void autoMergeFaces(),
-        },
-        {
-          label: "Unify Imported Meshes",
-          title: "sketchcraft: each imported building mesh that is not a solid (a GeoHVAC .dae) rebuilt as one solid from its roof: roof pieces sewn, upright walls, a flat floor",
-          disabled: !st?.meshes?.length,
-          onSelect: () => void unifyMeshes(),
-        },
-        {
-          label: "Delete Imported Meshes",
-          title: "Imported geometry that is not a solid",
-          disabled: !st?.meshes?.length,
-          onSelect: () => {
-            const ops: KernelOp[] = (st?.meshes ?? []).map((m) => ({ op: "delete_mesh", mesh: m.id }));
-            void apply(ops.length === 1 ? ops[0] : { op: "batch", ops }, () => `Deleted ${plural(ops.length, "imported mesh")}.`);
-          },
-        },
         "-",
         { label: "Restore Unsaved Work", disabled: !pendingRestore || pendingRestore.state !== "ok", onSelect: () => pendingRestore && restore(pendingRestore) },
         "-",
@@ -3268,6 +3199,82 @@ export function App() {
           ],
         },
         { label: "Settings…", title: "The render service (renders are off until one is set and answering)", onSelect: () => setSettingsOpen(true) },
+      ],
+      // sketchcraft E-53: the volume commands, out of Edit (JC, 19 nov. 2026 : « le menu
+      // édit devient confus »): solids, faces and points, orientation, imported meshes.
+      Volume: [
+        {
+          label: "Join Solids",
+          title: "sketchcraft: the selected solids, touching or overlapping, become one (union)",
+          disabled: selection.filter((x) => x.kind === "object").length < 2,
+          onSelect: () => void joinSolids(),
+        },
+        {
+          label: "Explode Solid into Faces",
+          title: "sketchcraft: each selected solid becomes plain faces (its volume goes); then Select + Delete removes a face",
+          disabled: !selection.some((x) => x.kind === "object"),
+          onSelect: () => void explodeSolids(),
+        },
+        {
+          label: "Make Solid from Faces",
+          title: "sketchcraft: the selected faces, if they close a volume, become one solid",
+          disabled: selection.filter((x) => x.kind === "region").length < 4,
+          onSelect: () => void solidFromFaces(),
+        },
+        {
+          label: "Extrude Faces Along Axis…",
+          title: "sketchcraft: the selected faces extruded together along an axis (blue by default) into one solid, e.g. a roof slab",
+          disabled: !selection.some((x) => x.kind === "region"),
+          onSelect: extrudeAlong,
+        },
+        "-",
+        {
+          label: "Merge Faces",
+          title: "sketchcraft: the selected faces of one solid, side by side and nearly in one plane (within 5 cm), made one flat face: the edges between them go",
+          disabled: selection.filter((x) => x.kind === "face").length < 2,
+          onSelect: () => void mergeFaces(),
+        },
+        {
+          label: "Auto Merge Faces",
+          title: "sketchcraft: in the selected solid, every group of faces side by side and nearly in one plane (within 5° and 5 cm) made one face",
+          disabled: !selection.some((x) => x.kind === "object" || x.kind === "face"),
+          onSelect: () => void autoMergeFaces(),
+        },
+        {
+          label: "Clean Up Points",
+          title: "sketchcraft: in the selected solids and faces (everything when nothing is selected), remove every point between two edges nearly in line (within 5 cm); Delete removes one selected point",
+          disabled: !(st?.stats.objects ?? 0) && !(st?.sketches?.length ?? 0),
+          onSelect: () => void cleanPoints(),
+        },
+        "-",
+        {
+          label: "Align to Axes",
+          title: "sketchcraft: turn the selected solids (all of them when none is selected) about blue so their walls run along red and green",
+          disabled: !(st?.stats.objects ?? 0),
+          onSelect: () => void alignToAxes(),
+        },
+        {
+          label: "Align Façade to Axes",
+          title: "sketchcraft: turn the building about blue so the selected façade (one wall face) faces along red or green, whichever is nearer",
+          disabled: selection.filter((x) => x.kind === "face").length !== 1,
+          onSelect: () => void alignFacade(),
+        },
+        "-",
+        {
+          label: "Unify Imported Meshes",
+          title: "sketchcraft: each imported building mesh that is not a solid (a GeoHVAC .dae) rebuilt as one solid from its roof: roof pieces sewn, upright walls, a flat floor",
+          disabled: !st?.meshes?.length,
+          onSelect: () => void unifyMeshes(),
+        },
+        {
+          label: "Delete Imported Meshes",
+          title: "Imported geometry that is not a solid",
+          disabled: !st?.meshes?.length,
+          onSelect: () => {
+            const ops: KernelOp[] = (st?.meshes ?? []).map((m) => ({ op: "delete_mesh", mesh: m.id }));
+            void apply(ops.length === 1 ? ops[0] : { op: "batch", ops }, () => `Deleted ${plural(ops.length, "imported mesh")}.`);
+          },
+        },
       ],
       View: [
         // Lane 12: the model or its drawing sheets.

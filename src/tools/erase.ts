@@ -16,7 +16,7 @@
 // segment). With a modifier, the flags go on every segment of the curve.
 import type { Entity, KernelOp, MeshData, V3 } from "../kernel/types";
 import { curveOf, curveSegments } from "../lib/curves";
-import { edgeFlagWords, entityKey, eraseOp, eraseOps } from "../lib/entities";
+import { edgeFlagWords, entityKey, eraseOp, eraseOps, erasedWords } from "../lib/entities";
 import { scopeEntity } from "../lib/scope";
 import { EMPTY_VIEW, Tool, type InferContext, type ToolEvent, type ToolView } from "./tool";
 
@@ -160,7 +160,7 @@ export class EraseTool extends Tool {
 
   private async run(ops: KernelOp[], n: number): Promise<void> {
     const op: KernelOp = ops.length === 1 ? ops[0] : { op: "batch", ops };
-    const r = await this.host.apply(op, () => `Erased ${n} item${n === 1 ? "" : "s"}.`);
+    const r = await this.host.apply(op, (res) => erasedWords(res.outcome, n));
     if (r) this.host.setSelection([]);
   }
 

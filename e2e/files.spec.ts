@@ -161,7 +161,7 @@ test("an open mesh comes in visible, is named in the HUD, and STL export refuses
   // GLB still takes it.
   const glb = await download(page, () => menu(page, "File", "Export", "glTF (GLB)…"));
   expect(glb.bytes.subarray(0, 4).toString()).toBe("glTF");
-  await menu(page, "Edit", "Delete Imported Meshes");
+  await menu(page, "Volume", "Delete Imported Meshes");
   await expect(page.locator(".hud")).not.toContainText("not solid");
 });
 

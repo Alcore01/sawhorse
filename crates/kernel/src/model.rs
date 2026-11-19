@@ -345,6 +345,22 @@ pub enum Op {
     UnifyMesh {
         mesh: u64,
     },
+    /// sketchcraft E-52: erase edges of a solid like the Eraser in SketchUp. A line drawn
+    /// on a face goes as with [`Op::EraseEdge`]; an edge between two faces nearly in one
+    /// plane (within 5° and 5 cm) goes and the two faces merge, the solid stays; any other
+    /// edge: the solid becomes plain faces ([`Op::ExplodeSolid`]) and the edge is erased
+    /// from them, so the faces it bounded go.
+    EraseSolidEdges {
+        object: u64,
+        /// Each edge by its two ends (world).
+        edges: Vec<[[f64; 3]; 2]>,
+    },
+    /// sketchcraft E-52: erase faces of a solid: one face drawn on another goes as with
+    /// [`Op::EraseFace`]; otherwise the solid becomes plain faces and those faces are erased.
+    EraseSolidFaces {
+        object: u64,
+        faces: Vec<u64>,
+    },
     /// sketchcraft E-50: remove a point of a solid that sits between two edges nearly in
     /// line (at most 5 cm off the line between its neighbours): the two edges become one,
     /// the faces on either side refit their planes. `at` is the point (world).
@@ -1048,6 +1064,12 @@ pub enum OpOutcome {
         merged: u64,
     },
     /// sketchcraft E-40: a mesh rebuilt as the solid `object`; `notes` say how.
+    /// sketchcraft E-52: a solid opened by erasing one of its edges or faces: it became
+    /// `face_count` plain faces, and `erased` of them went with what was erased.
+    SolidOpened {
+        face_count: u64,
+        erased: u64,
+    },
     /// sketchcraft E-50: points of a solid removed (DissolvePoint: 1; CleanPoints: how many).
     PointsCleaned {
         object: u64,
@@ -2528,6 +2550,8 @@ impl Model {
             Op::ExtrudeFaces { faces, vector } => self.extrude_faces(faces, *vector),
             Op::UnionSolids { objects } => self.union_solids(objects),
             Op::UnifyMesh { mesh } => self.unify_mesh(*mesh),
+            Op::EraseSolidEdges { object, edges } => self.erase_solid_edges(*object, edges),
+            Op::EraseSolidFaces { object, faces } => self.erase_solid_faces(*object, faces),
             Op::DissolvePoint { object, at } => {
                 let oid = self.object_key(*object)?;
                 self.editable_object(oid)?;
@@ -4517,6 +4541,147 @@ impl Model {
         self.mark(removed.member.parent);
         Ok(OpOutcome::SolidExploded { face_count: faces })
     }
+    /// sketchcraft E-52 (H-20261119-5): see [`Op::EraseSolidEdges`].
+    fn erase_solid_edges(
+        &mut self,
+        object: u64,
+        edges: &[[[f64; 3]; 2]],
+    ) -> Result<OpOutcome, KernelError> {
+        let k = from_public::<ObjectId>(object);
+        if !self.objects.contains_key(k) {
+            return Err(DocumentError::NoSuchObject(object).into());
+        }
+        self.editable_object(k)?;
+        let mut merged: Option<u64> = None;
+        // Edges that open the solid, with the planes of the faces either side.
+        let mut opening: Vec<(DVec3, DVec3, Vec<Plane>)> = Vec::new();
+        for e in edges {
+            let (a, b) = (DVec3::from_array(e[0]), DVec3::from_array(e[1]));
+            // A line drawn on a face: as before.
+            let mut trial = self.objects[k].clone();
+            if let Ok(face) = trial.erase_edge(a, b) {
+                self.objects[k] = trial;
+                self.touch(k);
+                merged = Some(face);
+                continue;
+            }
+            let p = self.objects[k].brep().to_polys();
+            let near = |q: DVec3| (0..p.points.len()).find(|&i| p.points[i].distance(q) <= 1e-4);
+            let (Some(ia), Some(ib)) = (near(a), near(b)) else {
+                return Err(not_a_volume("there is no such edge on this solid"));
+            };
+            let sides: Vec<usize> = (0..p.faces.len())
+                .filter(|&i| {
+                    let f = &p.faces[i];
+                    std::iter::once(&f.outer).chain(f.holes.iter()).any(|r| {
+                        (0..r.len()).any(|j| {
+                            let (x, y) = (r[j], r[(j + 1) % r.len()]);
+                            (x, y) == (ia, ib) || (x, y) == (ib, ia)
+                        })
+                    })
+                })
+                .collect();
+            let [fi, fj] = sides[..] else {
+                return Err(not_a_volume("there is no such edge on this solid"));
+            };
+            // Two faces nearly in one plane: they merge, the solid stays.
+            if let (Some(pi), Some(pj)) = (p.plane(fi), p.plane(fj))
+                && pi.normal.dot(pj.normal) >= 5f64.to_radians().cos()
+                && let (Some(idi), Some(idj)) = (p.faces[fi].id, p.faces[fj].id)
+                && let Ok((next, face)) = merged_object(&self.objects[k], &[idi, idj])
+            {
+                self.objects[k] = next;
+                self.touch(k);
+                merged = Some(face);
+                continue;
+            }
+            let planes: Vec<Plane> = [fi, fj].iter().filter_map(|&i| p.plane(i)).collect();
+            opening.push((a, b, planes));
+        }
+        if opening.is_empty() {
+            return Ok(OpOutcome::FacesMerged {
+                face: merged.unwrap_or(0),
+            });
+        }
+        // The solid opens: plain faces, and the edges erased from them.
+        let OpOutcome::SolidExploded { face_count } = self.explode_solid(object)? else {
+            unreachable!("explode_solid returns SolidExploded")
+        };
+        let mut erased = 0u64;
+        for (a, b, planes) in opening {
+            for pl in planes {
+                let sid = self.sketch_on(&pl);
+                let sp = *self.sketches[sid].plane();
+                let before = self.sketches[sid].regions().count() as u64;
+                self.sketches[sid].erase_segment(sp.to_local(a), sp.to_local(b))?;
+                erased += before.saturating_sub(self.sketches[sid].regions().count() as u64);
+            }
+        }
+        Ok(OpOutcome::SolidOpened { face_count, erased })
+    }
+
+    /// sketchcraft E-52 (H-20261119-5): see [`Op::EraseSolidFaces`].
+    fn erase_solid_faces(&mut self, object: u64, faces: &[u64]) -> Result<OpOutcome, KernelError> {
+        let k = from_public::<ObjectId>(object);
+        if !self.objects.contains_key(k) {
+            return Err(DocumentError::NoSuchObject(object).into());
+        }
+        self.editable_object(k)?;
+        let mut ordinals = Vec::with_capacity(faces.len());
+        for &f in faces {
+            ordinals.push(
+                self.objects[k]
+                    .face_ordinal(f)
+                    .ok_or(FaceEditError::NoSuchFace(f))?,
+            );
+        }
+        // One face drawn on another: as before.
+        if let [fi] = ordinals[..] {
+            let mut trial = self.objects[k].clone();
+            if let Ok(f) = trial.erase_face(fi) {
+                self.objects[k] = trial;
+                self.touch(k);
+                return Ok(OpOutcome::FacesMerged { face: f });
+            }
+        }
+        let p = self.objects[k].brep().to_polys();
+        let mut doomed_faces: Vec<(Plane, Vec<Vec<DVec3>>)> = Vec::new();
+        for &fi in &ordinals {
+            let plane = p
+                .plane(fi)
+                .ok_or_else(|| not_a_volume("that face has no plane"))?;
+            let rings: Vec<Vec<DVec3>> = p.faces[fi]
+                .rings()
+                .map(|r| r.iter().map(|&i| p.points[i]).collect())
+                .collect();
+            doomed_faces.push((plane, rings));
+        }
+        let OpOutcome::SolidExploded { face_count } = self.explode_solid(object)? else {
+            unreachable!("explode_solid returns SolidExploded")
+        };
+        let mut erased = 0u64;
+        for (plane, rings) in doomed_faces {
+            let sid = self.sketch_on(&plane);
+            let sp = *self.sketches[sid].plane();
+            let local: Vec<Vec<DVec2>> = rings
+                .iter()
+                .map(|r| r.iter().map(|&q| sp.to_local(q)).collect())
+                .collect();
+            let doomed: Vec<RegionId> = self.sketches[sid]
+                .regions()
+                .filter(|(_, reg)| crate::sketch::inside_rings(reg.anchor, &local[0], &local[1..]))
+                .map(|(r, _)| r)
+                .collect();
+            for r in doomed {
+                if self.sketches[sid].regions().any(|(x, _)| x == r) {
+                    self.sketches[sid].erase_region(r)?;
+                    erased += 1;
+                }
+            }
+        }
+        Ok(OpOutcome::SolidOpened { face_count, erased })
+    }
+
     /// sketchcraft E-28 (H-20261117-5): see [`Op::SolidFromFaces`].
     fn solid_from_faces(&mut self, faces: &[[u64; 2]]) -> Result<OpOutcome, KernelError> {
         if faces.len() < 4 {

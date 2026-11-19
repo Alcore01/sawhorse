@@ -127,7 +127,7 @@ describe("Erase tool", () => {
     const t = new EraseTool(h);
     t.onEvent(ev("click", [0.5, 0, 1], { picked: pickOf(edge) }));
     await Promise.resolve();
-    expect(h.ops).toEqual([{ op: "erase_edge", object: 1, a: [0, 0, 1], b: [1, 0, 1] }]);
+    expect(h.ops).toEqual([{ op: "erase_solid_edges", object: 1, edges: [[[0, 0, 1], [1, 0, 1]]] }]);
     // A solid's rim curve is refused here (it would open the solid).
     t.onEvent(ev("click", [0, 0, 1], { picked: pickOf({ kind: "curve", owner: { kind: "object", id: 1 }, curve: 0 }) }));
     expect(h.statuses.at(-1)?.error).toBe(true);
@@ -149,9 +149,11 @@ describe("Erase tool", () => {
     expect(t.view().overlay[0].points).toHaveLength(4);
     t.onEvent(ev("dragend", [1, 1, 1], { start: [0, 0] }));
     await Promise.resolve();
+    // sketchcraft E-52: both edges of solid 1 go in one op (if the first opened the solid,
+    // a second op would find it gone).
     expect(h.ops).toHaveLength(1);
-    expect(h.ops[0]).toMatchObject({ op: "batch" });
-    expect((h.ops[0] as { ops: unknown[] }).ops).toHaveLength(2);
+    expect(h.ops[0]).toMatchObject({ op: "erase_solid_edges", object: 1 });
+    expect((h.ops[0] as { edges: unknown[] }).edges).toHaveLength(2);
   });
 });
 

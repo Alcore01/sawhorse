@@ -1,4 +1,4 @@
-// sketchcraft E-30 (H-20261117-7): what Edit > Extrude Faces Along Axis reads: a length,
+// sketchcraft E-30 (H-20261117-7): what Volume > Extrude Faces Along Axis reads: a length,
 // along blue unless a red/green/blue (or x/y/z) axis comes first; negative goes the other way.
 import { parseLength, type UnitSystem } from "./units";
 

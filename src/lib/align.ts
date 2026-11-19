@@ -1,4 +1,4 @@
-// sketchcraft E-43 (H-20261118-1): Edit > Align to Axes. An imported building (GeoHVAC's
+// sketchcraft E-43 (H-20261118-1): Volume > Align to Axes. An imported building (GeoHVAC's
 // .dae keep their real orientation) sits askew to red and green; this finds the turn about
 // blue that lines its walls up with them. The walls' level edges vote, each by its length,
 // on a direction modulo 90° (the mean of 4 × its angle), so walls at right angles agree and

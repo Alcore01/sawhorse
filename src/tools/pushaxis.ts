@@ -98,7 +98,7 @@ export class PushAxisTool extends Tool {
         const at = s?.at;
         if (!s || at?.kind !== "region") {
           this.fresh = false;
-          if (at?.kind === "face") h.status("Push along an axis takes faces of sketches; a solid's face goes with Push/Pull (P), or Edit > Explode Solid into Faces first.", true);
+          if (at?.kind === "face") h.status("Push along an axis takes faces of sketches; a solid's face goes with Push/Pull (P), or Volume > Explode Solid into Faces first.", true);
           return;
         }
         if (!sketchEditable(h.state(), at.sketch)) {

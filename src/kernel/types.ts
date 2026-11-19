@@ -69,6 +69,9 @@ export type KernelOp =
   | { op: "dissolve_point"; object: number; at: V3 }
   | { op: "dissolve_sketch_point"; sketch: number; at: [number, number] }
   | { op: "clean_points"; object: number }
+  /** sketchcraft E-52: edges and faces of a solid erased as in SketchUp (merge, or the solid opens into plain faces). */
+  | { op: "erase_solid_edges"; object: number; edges: [V3, V3][] }
+  | { op: "erase_solid_faces"; object: number; faces: number[] }
   | { op: "clean_sketch_points"; sketch: number }
   // sketchcraft E-42: every group of nearly coplanar neighbouring faces of a solid merged.
   | { op: "auto_merge_faces"; object: number }
@@ -404,6 +407,7 @@ export type OpOutcome =
   | { kind: "mesh_unified"; object: number; notes: string[] }
   | { kind: "auto_merged"; object: number; merged: number }
   | { kind: "points_cleaned"; object: number; removed: number }
+  | { kind: "solid_opened"; face_count: number; erased: number }
   | { kind: "sketch_points_cleaned"; sketch: number; removed: number }
   | { kind: "part_set" }
   | { kind: "loose_grouped"; groups: number[] }

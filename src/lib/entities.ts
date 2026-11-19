@@ -312,11 +312,15 @@ export function eraseOp(e: Entity, state: DocState | null): KernelOp | string {
     case "object":
       return { op: "delete_object", object: e.object };
     case "face":
-      return { op: "erase_face", object: e.object, face: e.face };
+      // sketchcraft E-52: a face drawn on another merges back; any other face opens the
+      // solid into plain faces and goes (JC's choice a, 18 nov. 2026).
+      return { op: "erase_solid_faces", object: e.object, faces: [e.face] };
     case "region":
       return { op: "erase_region", sketch: e.sketch, region: e.region };
     case "edge": {
-      if (e.owner.kind === "object") return { op: "erase_edge", object: e.owner.id, a: e.a, b: e.b };
+      // sketchcraft E-52: a drawn line or an edge between faces in one plane goes (the
+      // solid stays); any other edge opens the solid and its faces go.
+      if (e.owner.kind === "object") return { op: "erase_solid_edges", object: e.owner.id, edges: [[e.a, e.b]] };
       if (e.owner.kind === "sketch") {
         const s = state?.sketches.find((x) => x.id === e.owner.id);
         if (!s) return "That sketch no longer exists.";
@@ -378,6 +382,16 @@ export function eraseOps(sel: Entity[], state: DocState | null, mesh: MeshData |
         if (s) ops.push({ op: "dissolve_sketch_point", sketch: s.id, at: toSketch(s, e.at) });
       }
   }
+  // sketchcraft E-52: one op per solid for its edges, one for its faces (the first that
+  // opens the solid would leave the next without it).
+  const merged: KernelOp[] = [];
+  for (const o of ops) {
+    const prev = merged.find((m) => (o.op === "erase_solid_edges" && m.op === "erase_solid_edges") || (o.op === "erase_solid_faces" && m.op === "erase_solid_faces") ? (m as { object: number }).object === (o as { object: number }).object : false);
+    if (prev?.op === "erase_solid_edges" && o.op === "erase_solid_edges") prev.edges.push(...o.edges);
+    else if (prev?.op === "erase_solid_faces" && o.op === "erase_solid_faces") prev.faces.push(...o.faces);
+    else merged.push(o);
+  }
+  ops.splice(0, ops.length, ...merged);
   const seen = new Set<string>();
   return { ops: ops.filter((o) => (o.op === "dissolve_point" || o.op === "dissolve_sketch_point" ? !seen.has(JSON.stringify(o)) && !!seen.add(JSON.stringify(o)) : true)), skipped };
 }
@@ -565,4 +579,12 @@ export function boxSelect(mesh: MeshData | null, toScreen: (p: V3) => P2, box: B
 export function edgeFlagWords(flags: number | undefined): string {
   const w = [flags && flags & 1 ? "soft" : "", flags && flags & 2 ? "smooth" : "", flags && flags & 4 ? "hidden" : ""].filter(Boolean);
   return w.length <= 1 ? (w[0] ?? "") : `${w.slice(0, -1).join(", ")} and ${w[w.length - 1]}`;
+}
+
+/** sketchcraft E-52: what an erase did, for the status line: when a solid opened into plain
+ * faces, say so and how to close it again. */
+export function erasedWords(outcome: { kind: string; outcomes?: { kind: string }[] }, n: number): string {
+  const outs = outcome.kind === "batch" ? (outcome.outcomes ?? []) : [outcome];
+  const base = `Erased ${n} item${n === 1 ? "" : "s"}`;
+  return outs.some((o) => o.kind === "solid_opened") ? `${base}: the solid opened into plain faces (its volume is no longer counted; Volume > Make Solid from Faces closes it again).` : `${base}.`;
 }

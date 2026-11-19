@@ -42,7 +42,7 @@ describe("Eraser modifiers", () => {
     ]);
     t.onEvent(ev("click", [0, 0, 0], { picked: picked(E1) }));
     await Promise.resolve();
-    expect(h.ops.at(-1)?.op).toBe("erase_edge");
+    expect(h.ops.at(-1)?.op).toBe("erase_solid_edges");
   });
 
   it("a Ctrl-drag across edges softens them all in one op", async () => {

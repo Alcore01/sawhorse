@@ -116,9 +116,9 @@ describe("highlights", () => {
 
 describe("erasing", () => {
   it("maps every entity to its kernel op", () => {
-    expect(eraseOp(face, state)).toEqual({ op: "erase_face", object: 1, face: 2 });
+    expect(eraseOp(face, state)).toEqual({ op: "erase_solid_faces", object: 1, faces: [2] });
     expect(eraseOp(region, state)).toEqual({ op: "erase_region", sketch: 1, region: 4 });
-    expect(eraseOp(objEdge, state)).toEqual({ op: "erase_edge", object: 1, a: [0, 0, 1], b: [1, 0, 1] });
+    expect(eraseOp(objEdge, state)).toEqual({ op: "erase_solid_edges", object: 1, edges: [[[0, 0, 1], [1, 0, 1]]] });
     expect(eraseOp(sketchEdge, state)).toEqual({ op: "erase_segment", sketch: 1, a: [3, 0], b: [4, 0] });
     expect(eraseOp({ kind: "object", object: 1 }, state)).toEqual({ op: "delete_object", object: 1 });
     // sketchcraft E-50: a point between two edges in line can go now (the kernel says why when not).
