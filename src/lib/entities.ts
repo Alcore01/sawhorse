@@ -427,13 +427,13 @@ export interface Box2 {
   y1: number;
 }
 
-type P2 = [number, number];
+export type P2 = [number, number];
 
-function norm(b: Box2): Box2 {
+export function norm(b: Box2): Box2 {
   return { x0: Math.min(b.x0, b.x1), y0: Math.min(b.y0, b.y1), x1: Math.max(b.x0, b.x1), y1: Math.max(b.y0, b.y1) };
 }
 
-const inBox = (b: Box2, p: P2) => p[0] >= b.x0 && p[0] <= b.x1 && p[1] >= b.y0 && p[1] <= b.y1;
+export const inBox = (b: Box2, p: P2) => p[0] >= b.x0 && p[0] <= b.x1 && p[1] >= b.y0 && p[1] <= b.y1;
 
 function segsCross(a: P2, b: P2, c: P2, d: P2): boolean {
   const o = (p: P2, q: P2, r: P2) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
@@ -444,7 +444,7 @@ function segsCross(a: P2, b: P2, c: P2, d: P2): boolean {
   return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
 }
 
-function segmentTouches(b: Box2, p: P2, q: P2): boolean {
+export function segmentTouches(b: Box2, p: P2, q: P2): boolean {
   if (inBox(b, p) || inBox(b, q)) return true;
   const c: P2[] = [
     [b.x0, b.y0],
@@ -461,7 +461,7 @@ function pointInTri(p: P2, a: P2, b: P2, c: P2): boolean {
   return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
 }
 
-function triangleTouches(b: Box2, a: P2, c: P2, d: P2): boolean {
+export function triangleTouches(b: Box2, a: P2, c: P2, d: P2): boolean {
   if (segmentTouches(b, a, c) || segmentTouches(b, c, d) || segmentTouches(b, d, a)) return true;
   return pointInTri([b.x0, b.y0], a, c, d);
 }

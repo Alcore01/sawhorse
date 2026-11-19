@@ -148,3 +148,39 @@ describe("Erase tool", () => {
     expect((h.ops[0] as { ops: unknown[] }).ops).toHaveLength(2);
   });
 });
+
+describe("Select tool with the selection filter (sketchcraft E-49)", () => {
+  // A 1 m square face of solid 1 at z = 1.
+  const sq: [number, number, number][] = [
+    [0, 0, 1],
+    [1, 0, 1],
+    [1, 1, 1],
+    [0, 1, 1],
+  ];
+  const mesh = {
+    positions: new Float32Array(sq.flat()),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+    faceIds: new Uint32Array([0, 0]),
+    edges: new Float32Array(sq.flatMap((p, i) => [...p, ...sq[(i + 1) % 4]])),
+    edgeOwner: new Uint32Array([0, 0, 0, 0]),
+    edgeOwners: [{ kind: "object", id: 1 }],
+    parts: [{ kind: "face", owner: 1, index: 2, origin: [0, 0, 1], normal: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0] }],
+  } as never;
+
+  it("in Points, a click on the face near a corner selects that corner, and says where it is", () => {
+    const h = fakeHost({ _mesh: mesh, _units: "m" });
+    h.pickFilter = () => "vertex";
+    const t = new SelectTool(h);
+    t.onEvent(ev("click", [0.9, 0.9, 1], { picked: { entity: face, point: [0.9, 0.9, 1], surface: null } }));
+    expect(h.sel).toEqual([{ kind: "vertex", owner: { kind: "object", id: 1 }, at: [1, 1, 1] }]);
+    expect(h.statuses.at(-1)?.text).toMatch(/^Selected a point: x .*1.*, y .*1.*, z .*1.*\.$/);
+  });
+
+  it("in Faces, a click on an edge selects the face under it", () => {
+    const h = fakeHost({ _mesh: mesh });
+    h.pickFilter = () => "face";
+    const t = new SelectTool(h);
+    t.onEvent(ev("click", [0.5, 0, 1], { picked: { entity: edge, point: [0.5, 0, 1], surface: { at: { kind: "face", object: 1, face: 2 }, frame: {} as never, point: [0.5, 0, 1], t: 1 } } }));
+    expect(h.sel).toEqual([{ kind: "face", object: 1, face: 2 }]);
+  });
+});

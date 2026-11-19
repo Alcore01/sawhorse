@@ -20,6 +20,7 @@ import type { DocState, Entity, MeshData } from "../kernel/types";
 import { curveOf, describeCurve } from "../lib/curves";
 import { applySelection, boxSelect, edgeFlagWords, entityKey, modeFor, objectOf } from "../lib/entities";
 import { faceOf, regionName, solidName } from "../lib/names";
+import { boxFilter, filterPick } from "../lib/pickFilter";
 import { describeNode, graphOf, reachableContext, scopeEntity } from "../lib/scope";
 import { describeSection } from "../lib/sections";
 import { EMPTY_VIEW, Tool, type ToolEvent, type ToolView } from "./tool";
@@ -59,6 +60,13 @@ export class SelectTool extends Tool {
     return curveOf(scopeEntity(raw, this.host.state()), this.host.mesh());
   }
 
+  /** sketchcraft E-49: the picked entity under the selection filter. */
+  private filtered(e: ToolEvent): Entity | null {
+    const f = this.host.pickFilter?.() ?? "all";
+    if (f === "all") return e.picked?.entity ?? null;
+    return filterPick(e.picked, f, this.host.mesh(), (p) => this.host.toScreen(p), [e.x, e.y]);
+  }
+
   /** The status line for a selected entity. */
   private say(ent: Entity): string {
     const h = this.host;
@@ -70,7 +78,7 @@ export class SelectTool extends Tool {
     switch (e.type) {
       case "move": {
         const sec = this.sectionAt(e);
-        h.hover(sec ? scopeEntity({ kind: "section", section: sec.section }, h.state()) : this.unit(e.picked?.entity ?? null));
+        h.hover(sec ? scopeEntity({ kind: "section", section: sec.section }, h.state()) : this.unit(this.filtered(e)));
         return;
       }
       case "leave":
@@ -90,7 +98,7 @@ export class SelectTool extends Tool {
             return;
           }
         }
-        const raw = e.picked?.entity ?? null;
+        const raw = this.filtered(e);
         const ent = this.unit(raw);
         const mode = modeFor(e);
         if (!ent && raw) {
@@ -154,7 +162,9 @@ export class SelectTool extends Tool {
         // anything outside the open one is left out.
         const seen = new Set<string>();
         const found: Entity[] = [];
-        for (const raw of boxSelect(h.mesh(), (p) => h.toScreen(p), b, crossing)) {
+        const f = h.pickFilter?.() ?? "all";
+        const raws = f === "all" ? boxSelect(h.mesh(), (p) => h.toScreen(p), b, crossing) : boxFilter(h.mesh(), (p) => h.toScreen(p), b, crossing, f);
+        for (const raw of raws) {
           const ent = scopeEntity(raw, h.state());
           if (!ent || seen.has(entityKey(ent))) continue;
           seen.add(entityKey(ent));
@@ -194,8 +204,11 @@ export function describe(e: Entity, state?: DocState | null, ctx?: DescribeConte
         : e.drawn
           ? `Selected a line drawn on ${solidName(e.owner.id)}. Delete erases it.`
           : `Selected an edge of ${solidName(e.owner.id)}${edgeFlagWords(e.flags) ? ` (${edgeFlagWords(e.flags)})` : ""}.`;
-    case "vertex":
-      return "Selected a point.";
+    case "vertex": {
+      // sketchcraft E-49: its coordinates (the Point panel edits them).
+      const f = ctx?.fmt ?? ((m: number) => `${m}`);
+      return `Selected a point: x ${f(e.at[0])}, y ${f(e.at[1])}, z ${f(e.at[2])}.`;
+    }
     case "region":
       return `Selected ${regionName(e.sketch, e.region)}. Push/Pull (P) raises it; Delete erases it.`;
     case "object":

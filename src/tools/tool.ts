@@ -1,3 +1,4 @@
+import type { PickFilter } from "../lib/pickFilter";
 // The tool framework. Every tool is a small state machine fed with pointer events that
 // already carry what is under the cursor (a pick) and where the cursor snaps (an
 // inference), keyboard events, and Value Control Box entries. Tools change the document
@@ -131,6 +132,8 @@ export interface ToolHost {
   /** sketchcraft E-37: the loose faces reached from a sketch region across shared edges
    * (itself included), as [sketch, region] pairs. Optional: without it, no such selection. */
   connectedFaces?(sketch: number, region: number): Promise<[number, number][]>;
+  /** sketchcraft E-49: the selection filter (Points, Edges, Faces; "all" when absent). */
+  pickFilter?(): PickFilter;
   /** World rings of a face or region, or (lane 23) a curve's points as one ring (empty when
    * it is gone). */
   outline(t: OutlineTarget): Promise<V3[][]>;

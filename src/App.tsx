@@ -71,7 +71,9 @@ import { ImportReport, type Report } from "./components/ImportReport";
 import { NameDialog, type NameRequest } from "./components/NameDialog";
 import { parseAlong } from "./lib/extrudeAlong";
 import { facadeAngle, planCentre, solidEdges, wallAngle } from "./lib/align";
-import { rotation } from "./tools/xform";
+import { meshPoints, type PickFilter } from "./lib/pickFilter";
+import { PickFilterSwitch, PointPanel } from "./components/PointPanel";
+import { rotation, translation } from "./tools/xform";
 import { APP_NAME } from "./lib/brand";
 import { KeyBar } from "./components/KeyBar";
 import { SceneTabs } from "./components/SceneTabs";
@@ -366,6 +368,10 @@ export function App() {
   const [toolId, setToolId] = useState<ToolId>("select");
   const tool = toolById(toolId);
   const [units, setUnits] = useState<UnitSystem>(loadUnits);
+  // sketchcraft E-49: the selection filter (read by the Select tool through the host).
+  const [pickFilter, setPickFilter] = useState<PickFilter>("all");
+  const pickFilterRef = useRef<PickFilter>("all");
+  pickFilterRef.current = pickFilter;
   const [scene, setScene] = useState<SceneData | null>(null);
   const [kernelState, setKernelState] = useState<KernelState>("loading");
   const [kernelNote, setKernelNote] = useState<string | null>(null);
@@ -1415,6 +1421,7 @@ export function App() {
         const step: RememberedStep = { from: last.from, to, before, beforeTarget: last.target, after: live.current.selection, afterTarget: live.current.target };
         stepSelections.current = [...stepSelections.current.filter((s) => s.from !== step.from || s.to !== step.to).slice(-199), step];
       },
+      pickFilter: () => pickFilterRef.current,
       connectedFaces: async (sketch, region) => {
         const k = kernelRef.current;
         if (!k) return [];
@@ -2021,6 +2028,27 @@ export function App() {
     const xform = rotation(planCentre(edges), [0, 0, 1], -a);
     await apply({ op: "transform", objects, xform }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the walls run along red and green. Its real orientation is ${deg.toFixed(2)}° from this (north for the sun and shadows); Undo turns it back.`);
   }, [apply]);
+
+  /** sketchcraft E-49: the one selected point of a solid, for the Point panel. */
+  const onePoint = useMemo(() => {
+    const e = selection.length === 1 ? selection[0] : null;
+    return e?.kind === "vertex" && e.owner.kind === "object" ? { object: e.owner.id, at: e.at } : null;
+  }, [selection]);
+
+  /** sketchcraft E-49: move one point of a solid to typed coordinates; its faces fold where
+   * they must stay flat; the moved point stays selected. */
+  const movePoint = useCallback(
+    async (object: number, from: V3, to: V3) => {
+      const d: V3 = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
+      const fu = (m: number) => formatLength(m, live.current.units);
+      const r = await apply({ op: "transform_geometry", object, points: [from], xform: translation(d), autofold: true }, () => `Moved the point to x ${fu(to[0])}, y ${fu(to[1])}, z ${fu(to[2])}.`);
+      if (!r) return;
+      const sel: Entity[] = [{ kind: "vertex", owner: { kind: "object", id: object }, at: to }];
+      live.current.selection = sel;
+      setSelection(sel);
+    },
+    [apply],
+  );
 
   /** sketchcraft E-48: Edit > Align Façade to Axes: the selected façade (one face) turned
    * about blue so it faces the nearest of red and green, its whole solid with it (and the other
@@ -2986,7 +3014,10 @@ export function App() {
   // Grain arrows on every drawn piece while the Cut list pane is open.
   const grain = useMemo(() => (cutOpen ? grainOverlay(cutList) : []), [cutOpen, cutList]);
   const overlay = useMemo(() => [...contextBox, ...grain, ...annotations.overlay, ...toolView.overlay], [contextBox, grain, annotations, toolView.overlay]);
-  const labels = useMemo(() => [...annotations.labels, ...toolView.labels], [annotations, toolView.labels]);
+  // sketchcraft E-49: in Points, every point of the solids and sketches as a dot (hidden
+  // behind the solid, like the dimensions).
+  const pointDots = useMemo(() => (pickFilter === "vertex" ? meshPoints(scene?.mesh ?? null).map((at) => ({ at, text: "", className: "vdot", occlude: true })) : []), [pickFilter, scene?.mesh]);
+  const labels = useMemo(() => [...annotations.labels, ...pointDots, ...toolView.labels], [annotations, pointDots, toolView.labels]);
 
   /** Switch one of the style's section settings (one undo step). */
   const setSectionStyle = useCallback(
@@ -3369,7 +3400,19 @@ export function App() {
         onUpdate={updateScene}
         onRename={renameScene}
         onDelete={deleteScene}
-        lead={<ModeSwitch mode={mode} onMode={setMode} sheets={scene?.sheets?.length ?? 0} />}
+        lead={
+          <>
+            <ModeSwitch mode={mode} onMode={setMode} sheets={scene?.sheets?.length ?? 0} />
+            <PickFilterSwitch
+              filter={pickFilter}
+              onFilter={(f) => {
+                setPickFilter(f);
+                setMessage({ text: f === "all" ? "Selection: anything." : f === "vertex" ? "Selection: points only. Click a point to see and edit its X, Y, Z." : f === "edge" ? "Selection: edges only." : "Selection: faces only.", error: false });
+              }}
+            />
+            {onePoint ? <PointPanel at={onePoint.at} units={units} onMove={(to) => void movePoint(onePoint.object, onePoint.at, to)} onError={(text) => setMessage({ text, error: true })} /> : null}
+          </>
+        }
       />
       {mode === "sheets" ? (
         <SheetsWorkspace
