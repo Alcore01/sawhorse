@@ -36,6 +36,9 @@ pub enum SketchError {
     },
     #[error("bad sketch plane: {0}")]
     Plane(#[from] PlaneError),
+    /// sketchcraft E-50: a point that cannot be removed, and why.
+    #[error("that point stays: {0}")]
+    PointStays(&'static str),
 }
 
 /// Errors from building a B-rep out of polygons.

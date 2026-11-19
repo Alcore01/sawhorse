@@ -324,8 +324,17 @@ export function eraseOp(e: Entity, state: DocState | null): KernelOp | string {
       }
       return "Erase the guide itself, or use Edit > Delete Guides.";
     }
-    case "vertex":
+    case "vertex": {
+      // sketchcraft E-50: a point between two edges nearly in line goes (the kernel says
+      // why when it cannot). A sketch point shared by other sketches: see eraseOps.
+      if (e.owner.kind === "object") return { op: "dissolve_point", object: e.owner.id, at: e.at };
+      if (e.owner.kind === "sketch") {
+        const s = state?.sketches.find((x) => x.id === e.owner.id);
+        if (!s) return "That sketch no longer exists.";
+        return { op: "dissolve_sketch_point", sketch: s.id, at: toSketch(s, e.at) };
+      }
       return "A point goes with its edges: erase an edge instead.";
+    }
     case "curve":
       // Lane 23: the Eraser takes a curve whole.
       if (e.owner.kind === "sketch") return { op: "erase_curve", sketch: e.owner.id, curve: e.curve };
@@ -361,8 +370,31 @@ export function eraseOps(sel: Entity[], state: DocState | null, mesh: MeshData |
     const r = eraseOp(e, state);
     if (typeof r === "string") skipped.push(r);
     else ops.push(r);
+    // sketchcraft E-50: the same point in the other sketches it lies between two edges of
+    // (a wall's and a roof's), so the faces still meet there.
+    if (e.kind === "vertex" && e.owner.kind === "sketch")
+      for (const id of sketchesThrough(e.at, mesh)) {
+        const s = id === e.owner.id ? null : state?.sketches.find((x) => x.id === id);
+        if (s) ops.push({ op: "dissolve_sketch_point", sketch: s.id, at: toSketch(s, e.at) });
+      }
   }
-  return { ops, skipped };
+  const seen = new Set<string>();
+  return { ops: ops.filter((o) => (o.op === "dissolve_point" || o.op === "dissolve_sketch_point" ? !seen.has(JSON.stringify(o)) && !!seen.add(JSON.stringify(o)) : true)), skipped };
+}
+
+/** sketchcraft E-50: the sketches with exactly two edges (in the view mesh) ending at `at`. */
+export function sketchesThrough(at: V3, mesh: MeshData | null, tol = 1e-4): number[] {
+  if (!mesh) return [];
+  const count = new Map<number, number>();
+  const e = mesh.edges;
+  for (let i = 0; i < mesh.edgeOwner.length; i++) {
+    const o = mesh.edgeOwners[mesh.edgeOwner[i]];
+    if (o?.kind !== "sketch") continue;
+    for (const k of [0, 3]) {
+      if (Math.hypot(e[6 * i + k] - at[0], e[6 * i + k + 1] - at[1], e[6 * i + k + 2] - at[2]) <= tol) count.set(o.id, (count.get(o.id) ?? 0) + 1);
+    }
+  }
+  return [...count].filter(([, n]) => n === 2).map(([id]) => id);
 }
 
 /** A segment's key at 10 micrometres (the view mesh is single precision), undirected. */

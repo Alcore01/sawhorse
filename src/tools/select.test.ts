@@ -128,9 +128,15 @@ describe("Erase tool", () => {
     t.onEvent(ev("click", [0.5, 0, 1], { picked: pickOf(edge) }));
     await Promise.resolve();
     expect(h.ops).toEqual([{ op: "erase_edge", object: 1, a: [0, 0, 1], b: [1, 0, 1] }]);
-    t.onEvent(ev("click", [0, 0, 1], { picked: pickOf({ kind: "vertex", owner: { kind: "object", id: 1 }, at: [0, 0, 1] }) }));
+    // A solid's rim curve is refused here (it would open the solid).
+    t.onEvent(ev("click", [0, 0, 1], { picked: pickOf({ kind: "curve", owner: { kind: "object", id: 1 }, curve: 0 }) }));
     expect(h.statuses.at(-1)?.error).toBe(true);
     expect(h.ops).toHaveLength(1);
+    // sketchcraft E-50: a point goes to the kernel, which removes it if it is between two
+    // edges in line (and says why not otherwise).
+    t.onEvent(ev("click", [0, 0, 1], { picked: pickOf({ kind: "vertex", owner: { kind: "object", id: 1 }, at: [0.5, 0, 1] }) }));
+    await Promise.resolve();
+    expect(h.ops.at(-1)).toEqual({ op: "dissolve_point", object: 1, at: [0.5, 0, 1] });
   });
 
   it("a drag across edges erases them all as one batch", async () => {

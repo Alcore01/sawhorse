@@ -121,7 +121,8 @@ describe("erasing", () => {
     expect(eraseOp(objEdge, state)).toEqual({ op: "erase_edge", object: 1, a: [0, 0, 1], b: [1, 0, 1] });
     expect(eraseOp(sketchEdge, state)).toEqual({ op: "erase_segment", sketch: 1, a: [3, 0], b: [4, 0] });
     expect(eraseOp({ kind: "object", object: 1 }, state)).toEqual({ op: "delete_object", object: 1 });
-    expect(typeof eraseOp({ kind: "vertex", owner: { kind: "object", id: 1 }, at: [0, 0, 0] }, state)).toBe("string");
+    // sketchcraft E-50: a point between two edges in line can go now (the kernel says why when not).
+    expect(eraseOp({ kind: "vertex", owner: { kind: "object", id: 1 }, at: [0, 0, 0] }, state)).toEqual({ op: "dissolve_point", object: 1, at: [0, 0, 0] });
   });
 
   it("deletes whole objects first and drops their own parts from the batch", () => {
@@ -155,5 +156,40 @@ describe("window and crossing selection", () => {
     expect(none).toEqual([]);
     const edgeOnly = boxSelect(mesh(), toScreen, { x0: 360, y0: 5, x1: 340, y1: -5 }, true);
     expect(edgeOnly.map((e) => e.kind).sort()).toEqual(["edge", "region"]);
+  });
+});
+
+describe("erasing a point (sketchcraft E-50)", () => {
+  const two: DocState = {
+    ...state,
+    sketches: [
+      { id: 1, origin: [0, 0, 0], normal: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0] },
+      { id: 2, origin: [0, 0, 0], normal: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1] },
+    ],
+  } as DocState;
+  // The point (1, 0, 0) between two edges of sketch 1 (the floor) and of sketch 2 (a wall).
+  const seg = (a: number[], b: number[]) => [...a, ...b];
+  const mesh = {
+    edges: new Float32Array([...seg([0, 0, 0], [1, 0, 0]), ...seg([1, 0, 0], [2, 0, 0]), ...seg([0, 0, 0], [1, 0, 0]), ...seg([1, 0, 0], [2, 0, 0]), ...seg([1, 0, 0], [1, 0, 1])]),
+    edgeOwner: new Uint32Array([0, 0, 1, 1, 1]),
+    edgeOwners: [
+      { kind: "sketch", id: 1 },
+      { kind: "sketch", id: 2 },
+    ],
+  } as unknown as MeshData;
+
+  it("a solid's point asks the kernel to remove it", () => {
+    expect(eraseOp({ kind: "vertex", owner: { kind: "object", id: 4 }, at: [1, 2, 3] }, state)).toEqual({ op: "dissolve_point", object: 4, at: [1, 2, 3] });
+  });
+
+  it("a sketch point goes from its sketch and from the others it lies between two edges of", () => {
+    const { ops } = eraseOps([{ kind: "vertex", owner: { kind: "sketch", id: 1 }, at: [1, 0, 0] }], two, mesh);
+    // Sketch 2 has three edges at that point (a corner there): it keeps it.
+    expect(ops).toEqual([{ op: "dissolve_sketch_point", sketch: 1, at: [1, 0] }]);
+    const lone = { ...mesh, edges: mesh.edges.slice(0, 24), edgeOwner: mesh.edgeOwner.slice(0, 4) } as MeshData;
+    expect(eraseOps([{ kind: "vertex", owner: { kind: "sketch", id: 1 }, at: [1, 0, 0] }], two, lone).ops).toEqual([
+      { op: "dissolve_sketch_point", sketch: 1, at: [1, 0] },
+      { op: "dissolve_sketch_point", sketch: 2, at: [1, 0] },
+    ]);
   });
 });

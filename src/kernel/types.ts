@@ -65,6 +65,11 @@ export type KernelOp =
   | { op: "unify_mesh"; mesh: number }
   // sketchcraft E-41: faces of one solid nearly in one plane made one flat face.
   | { op: "merge_faces"; object: number; faces: number[] }
+  /** sketchcraft E-50: a point between two edges nearly in line removed (solid: world; sketch: plane coordinates); every such point of a solid. */
+  | { op: "dissolve_point"; object: number; at: V3 }
+  | { op: "dissolve_sketch_point"; sketch: number; at: [number, number] }
+  | { op: "clean_points"; object: number }
+  | { op: "clean_sketch_points"; sketch: number }
   // sketchcraft E-42: every group of nearly coplanar neighbouring faces of a solid merged.
   | { op: "auto_merge_faces"; object: number }
   | { op: "delete_node"; node: number }
@@ -398,6 +403,8 @@ export type OpOutcome =
   | { kind: "mesh_deleted" }
   | { kind: "mesh_unified"; object: number; notes: string[] }
   | { kind: "auto_merged"; object: number; merged: number }
+  | { kind: "points_cleaned"; object: number; removed: number }
+  | { kind: "sketch_points_cleaned"; sketch: number; removed: number }
   | { kind: "part_set" }
   | { kind: "loose_grouped"; groups: number[] }
   | { kind: "edges_set"; changed: number }

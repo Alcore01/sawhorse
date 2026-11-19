@@ -345,6 +345,28 @@ pub enum Op {
     UnifyMesh {
         mesh: u64,
     },
+    /// sketchcraft E-50: remove a point of a solid that sits between two edges nearly in
+    /// line (at most 5 cm off the line between its neighbours): the two edges become one,
+    /// the faces on either side refit their planes. `at` is the point (world).
+    DissolvePoint {
+        object: u64,
+        at: [f64; 3],
+    },
+    /// sketchcraft E-50: the same for a sketch point (sketch-plane coordinates).
+    DissolveSketchPoint {
+        sketch: u64,
+        at: [f64; 2],
+    },
+    /// sketchcraft E-50: every point of the sketch between two edges nearly in line (within
+    /// 5 cm) removed.
+    CleanSketchPoints {
+        sketch: u64,
+    },
+    /// sketchcraft E-50: every point of the solid that sits between two edges nearly in line
+    /// (within 5 cm) removed, one after another while any is left.
+    CleanPoints {
+        object: u64,
+    },
     /// sketchcraft E-41: faces of one solid, next to each other and nearly in one plane
     /// (within 5 cm), made one flat face: their corners go onto the plane that fits them best
     /// (straight up or down, unless the plane is upright), the edges between them go.
@@ -1026,6 +1048,16 @@ pub enum OpOutcome {
         merged: u64,
     },
     /// sketchcraft E-40: a mesh rebuilt as the solid `object`; `notes` say how.
+    /// sketchcraft E-50: points of a solid removed (DissolvePoint: 1; CleanPoints: how many).
+    PointsCleaned {
+        object: u64,
+        removed: u64,
+    },
+    /// sketchcraft E-50: points of a sketch removed (CleanSketchPoints).
+    SketchPointsCleaned {
+        sketch: u64,
+        removed: u64,
+    },
     MeshUnified {
         object: u64,
         notes: Vec<String>,
@@ -2496,6 +2528,44 @@ impl Model {
             Op::ExtrudeFaces { faces, vector } => self.extrude_faces(faces, *vector),
             Op::UnionSolids { objects } => self.union_solids(objects),
             Op::UnifyMesh { mesh } => self.unify_mesh(*mesh),
+            Op::DissolvePoint { object, at } => {
+                let oid = self.object_key(*object)?;
+                self.editable_object(oid)?;
+                let next = dissolved_point(&self.objects[oid], DVec3::from_array(*at))?;
+                self.objects[oid] = next;
+                self.touch(oid);
+                Ok(OpOutcome::PointsCleaned {
+                    object: *object,
+                    removed: 1,
+                })
+            }
+            Op::DissolveSketchPoint { sketch, at } => {
+                let sid = self.sketch_edit_key(*sketch)?;
+                let r =
+                    self.sketches[sid].dissolve_point(DVec2::from_array(*at), MERGE_TOLERANCE)?;
+                Ok(Self::edited(r))
+            }
+            Op::CleanSketchPoints { sketch } => {
+                let sid = self.sketch_edit_key(*sketch)?;
+                let n = self.sketches[sid].clean_points(MERGE_TOLERANCE);
+                Ok(OpOutcome::SketchPointsCleaned {
+                    sketch: *sketch,
+                    removed: n as u64,
+                })
+            }
+            Op::CleanPoints { object } => {
+                let oid = self.object_key(*object)?;
+                self.editable_object(oid)?;
+                let (next, removed) = cleaned_points(&self.objects[oid]);
+                if removed > 0 {
+                    self.objects[oid] = next;
+                    self.touch(oid);
+                }
+                Ok(OpOutcome::PointsCleaned {
+                    object: *object,
+                    removed,
+                })
+            }
             Op::MergeFaces { object, faces } => self.merge_faces(*object, faces),
             Op::AutoMergeFaces { object } => self.auto_merge_faces(*object),
             Op::DeleteNode { node } => self.delete_node(*node),
@@ -5098,6 +5168,134 @@ fn face_groups(polys: &[Vec<Vec<usize>>]) -> Vec<Vec<usize>> {
         groups.push(g);
     }
     groups
+}
+
+/// sketchcraft E-50: `o` without its point at `at`: the point must join exactly two other
+/// points across all its faces (two edges) and lie at most [`MERGE_TOLERANCE`] off the line
+/// between them; it leaves every ring it is in, and those faces refit their planes.
+fn dissolved_point(o: &Object, at: DVec3) -> Result<Object, KernelError> {
+    let refuse = |m: &str| not_a_volume(&format!("that point stays: {m}"));
+    let mut p = o.brep().to_polys();
+    let Some(v) = (0..p.points.len())
+        .filter(|&i| p.points[i].distance(at) <= 1e-4)
+        .min_by(|&a, &b| {
+            p.points[a]
+                .distance(at)
+                .total_cmp(&p.points[b].distance(at))
+        })
+    else {
+        return Err(refuse("there is no point of this solid there"));
+    };
+    let mut around: BTreeSet<usize> = BTreeSet::new();
+    for f in &p.faces {
+        for r in std::iter::once(&f.outer).chain(f.holes.iter()) {
+            if let Some(k) = r.iter().position(|&x| x == v) {
+                around.insert(r[(k + r.len() - 1) % r.len()]);
+                around.insert(r[(k + 1) % r.len()]);
+            }
+        }
+    }
+    let [u, w] = around.iter().copied().collect::<Vec<_>>()[..] else {
+        return Err(refuse(
+            "it is a corner where three edges or more meet (only a point between two edges can go)",
+        ));
+    };
+    let (pu, pv, pw) = (p.points[u], p.points[v], p.points[w]);
+    let d = pw - pu;
+    let t = (pv - pu).dot(d) / d.length_squared().max(1e-18);
+    let off = (pv - (pu + d * t)).length();
+    if !(0.0..=1.0).contains(&t) || off > MERGE_TOLERANCE {
+        return Err(refuse(&format!(
+            "its two edges are not in line ({:.0} cm off the line, at most {:.0} cm)",
+            off * 100.0,
+            MERGE_TOLERANCE * 100.0
+        )));
+    }
+    for f in p.faces.iter_mut() {
+        let mut hit = false;
+        for r in std::iter::once(&mut f.outer).chain(f.holes.iter_mut()) {
+            if let Some(k) = r.iter().position(|&x| x == v) {
+                r.remove(k);
+                hit = true;
+            }
+        }
+        if hit {
+            f.plane = None;
+        }
+    }
+    if p.faces
+        .iter()
+        .any(|f| f.outer.len() < 3 || f.holes.iter().any(|h| h.len() < 3))
+    {
+        return Err(refuse("a face would be left with two corners"));
+    }
+    p.user_edges.retain(|&(a, b)| a != v && b != v);
+    // The point leaves the list too (an unused point would be an isolated vertex).
+    p.points.remove(v);
+    let down = |x: usize| if x > v { x - 1 } else { x };
+    for f in p.faces.iter_mut() {
+        for r in std::iter::once(&mut f.outer).chain(f.holes.iter_mut()) {
+            for x in r.iter_mut() {
+                *x = down(*x);
+            }
+        }
+    }
+    p.user_edges = p
+        .user_edges
+        .iter()
+        .map(|&(a, b)| (down(a), down(b)))
+        .collect();
+    let next = o.rebuilt(p).map_err(|e| refuse(&e.to_string()))?;
+    next.validate()
+        .map_err(|e| refuse(&format!("removing it would bend a face beside it ({e})")))?;
+    Ok(next)
+}
+
+/// sketchcraft E-50: `o` with every removable point ([`dissolved_point`]) gone, the straightest
+/// first, over again while any goes. Returns the solid and how many points went.
+fn cleaned_points(o: &Object) -> (Object, u64) {
+    let mut obj = o.clone();
+    let mut removed = 0u64;
+    let mut stuck: BTreeSet<[u64; 3]> = BTreeSet::new();
+    let key = |q: DVec3| [q.x.to_bits(), q.y.to_bits(), q.z.to_bits()];
+    for _ in 0..100_000 {
+        let p = obj.brep().to_polys();
+        let mut pair: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
+        for f in &p.faces {
+            for r in std::iter::once(&f.outer).chain(f.holes.iter()) {
+                for k in 0..r.len() {
+                    let (a, b) = (r[k], r[(k + 1) % r.len()]);
+                    pair.entry(a).or_default().insert(b);
+                    pair.entry(b).or_default().insert(a);
+                }
+            }
+        }
+        let mut cands: Vec<(f64, DVec3)> = pair
+            .iter()
+            .filter(|(_, n)| n.len() == 2)
+            .filter_map(|(&v, n)| {
+                let mut it = n.iter();
+                let (pu, pw, pv) = (p.points[*it.next()?], p.points[*it.next()?], p.points[v]);
+                let d = pw - pu;
+                let t = (pv - pu).dot(d) / d.length_squared().max(1e-18);
+                let off = (pv - (pu + d * t)).length();
+                ((0.0..=1.0).contains(&t) && off <= MERGE_TOLERANCE && !stuck.contains(&key(pv)))
+                    .then_some((off, pv))
+            })
+            .collect();
+        cands.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let Some(&(_, at)) = cands.first() else { break };
+        match dissolved_point(&obj, at) {
+            Ok(next) => {
+                obj = next;
+                removed += 1;
+            }
+            Err(_) => {
+                stuck.insert(key(at));
+            }
+        }
+    }
+    (obj, removed)
 }
 
 fn merged_object(o: &Object, faces: &[u64]) -> Result<(Object, u64), KernelError> {

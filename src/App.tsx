@@ -2029,6 +2029,34 @@ export function App() {
     await apply({ op: "transform", objects, xform }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the walls run along red and green. Its real orientation is ${deg.toFixed(2)}° from this (north for the sun and shadows); Undo turns it back.`);
   }, [apply]);
 
+  /** sketchcraft E-50: Edit > Clean Up Points: in the selected solids and sketches (all of
+   * them when nothing is selected), every point between two edges nearly in line (within
+   * 5 cm) removed; one undo step. */
+  const cleanPoints = useCallback(async () => {
+    const st0 = live.current.scene?.state;
+    if (!st0) return;
+    const sel = live.current.selection;
+    const objects = new Set<number>();
+    const sketches = new Set<number>();
+    for (const e of sel) {
+      if (e.kind === "object" || e.kind === "face") objects.add(e.object);
+      else if (e.kind === "region") sketches.add(e.sketch);
+      else if ((e.kind === "edge" || e.kind === "vertex" || e.kind === "curve") && e.owner.kind === "object") objects.add(e.owner.id);
+      else if ((e.kind === "edge" || e.kind === "vertex" || e.kind === "curve") && e.owner.kind === "sketch") sketches.add(e.owner.id);
+    }
+    if (!objects.size && !sketches.size) {
+      for (const o of st0.objects ?? []) objects.add(o);
+      for (const k of st0.sketches ?? []) sketches.add(k.id);
+    }
+    const ops: KernelOp[] = [...[...objects].map((object) => ({ op: "clean_points" as const, object })), ...[...sketches].map((sketch) => ({ op: "clean_sketch_points" as const, sketch }))];
+    if (!ops.length) return void setMessage({ text: "Nothing to clean up.", error: false });
+    await apply({ op: "batch", ops }, (r) => {
+      const outs = r.outcome.kind === "batch" ? r.outcome.outcomes : [r.outcome];
+      const n = outs.reduce((a, o) => a + (o.kind === "points_cleaned" || o.kind === "sketch_points_cleaned" ? o.removed : 0), 0);
+      return n ? `Removed ${plural(n, "point")} between two edges in line (within 5 cm).` : "No point to remove: every point is a corner.";
+    });
+  }, [apply]);
+
   /** sketchcraft E-49: the one selected point of a solid, for the Point panel. */
   const onePoint = useMemo(() => {
     const e = selection.length === 1 ? selection[0] : null;
@@ -3191,6 +3219,12 @@ export function App() {
           onSelect: () => void alignToAxes(),
         },
         {
+          label: "Clean Up Points",
+          title: "sketchcraft: in the selected solids and faces (everything when nothing is selected), remove every point between two edges nearly in line (within 5 cm); Delete removes one selected point",
+          disabled: !(st?.stats.objects ?? 0) && !(st?.sketches?.length ?? 0),
+          onSelect: () => void cleanPoints(),
+        },
+        {
           label: "Align Façade to Axes",
           title: "sketchcraft: turn the building about blue so the selected façade (one wall face) faces along red or green, whichever is nearer",
           disabled: selection.filter((x) => x.kind === "face").length !== 1,
@@ -3303,7 +3337,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, alignFacade, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, alignFacade, cleanPoints, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;

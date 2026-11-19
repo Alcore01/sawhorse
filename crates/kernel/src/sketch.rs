@@ -1366,15 +1366,106 @@ impl Sketch {
         Ok(changed)
     }
 
+    /// sketchcraft E-50: remove the point at `p` (within the merge distance) that joins
+    /// exactly two edges running nearly straight through it (it is at most `tol` off the line
+    /// between its neighbours): the two edges become one. Refused, with the reason, for a
+    /// corner, a point of three edges or more, a curve's point, or where the straight edge
+    /// would touch other geometry. Returns the live regions that changed.
+    pub fn dissolve_point(&mut self, p: DVec2, tol: f64) -> Result<Vec<RegionId>, SketchError> {
+        if !(in_bounds(p.x) && in_bounds(p.y)) {
+            return Err(SketchError::OutOfBounds);
+        }
+        let Some((v, _)) = self
+            .vertices
+            .iter()
+            .filter(|(_, q)| q.distance(p) <= SKETCH_MERGE)
+            .min_by(|a, b| a.1.distance(p).total_cmp(&b.1.distance(p)))
+        else {
+            return Err(SketchError::PointStays(
+                "there is no point of this sketch there",
+            ));
+        };
+        let degree = self.edges.values().filter(|e| e.contains(&v)).count();
+        if degree != 2 {
+            return Err(SketchError::PointStays(if degree > 2 {
+                "it joins three edges or more (only a point between two edges can go)"
+            } else {
+                "it ends an edge (erase the edge instead)"
+            }));
+        }
+        if self.curves.values().any(|c| c.chain.contains(&v)) {
+            return Err(SketchError::PointStays(
+                "it is a point of a curve (Explode Curve first)",
+            ));
+        }
+        let mut next = self.clone();
+        if !next.straighten(v, tol) {
+            return Err(SketchError::PointStays(
+                "its two edges are not in line (it is more than 5 cm off the line), or the straight edge would touch other lines",
+            ));
+        }
+        next.settle();
+        next.debug_check("dissolve_point");
+        let changed = next.changed_regions(self);
+        *self = next;
+        Ok(changed)
+    }
+
+    /// sketchcraft E-50: every point between two edges at most `tol` off their line removed
+    /// ([`Sketch::dissolve_point`]), the straightest first, while any goes. Returns how many
+    /// went (0: the sketch is unchanged).
+    pub fn clean_points(&mut self, tol: f64) -> usize {
+        let mut next = self.clone();
+        let mut gone = 0;
+        loop {
+            let mut cands: Vec<(f64, SVertexId)> = next
+                .vertices
+                .iter()
+                .filter(|(v, _)| !next.curves.values().any(|c| c.chain.contains(v)))
+                .filter_map(|(v, &pv)| {
+                    let ends: Vec<SVertexId> = next
+                        .edges
+                        .values()
+                        .filter(|e| e.contains(&v))
+                        .map(|e| if e[0] == v { e[1] } else { e[0] })
+                        .collect();
+                    let [u, w] = ends[..] else { return None };
+                    Some((
+                        point_segment_distance(pv, next.vertices[u], next.vertices[w]),
+                        v,
+                    ))
+                })
+                .filter(|(d, _)| *d <= tol)
+                .collect();
+            cands.sort_by(|a, b| a.0.total_cmp(&b.0));
+            if !cands.iter().any(|c| next.straighten(c.1, tol)) {
+                break;
+            }
+            gone += 1;
+        }
+        if gone > 0 {
+            next.settle();
+            next.debug_check("clean_points");
+            *self = next;
+        }
+        gone
+    }
+
     /// Remove `v` when it joins exactly two edges that run straight through it. A curve's
     /// point stays (lane 23: it is a point of the curve, and the curve's chain names it).
     fn heal_vertex(&mut self, v: SVertexId) {
-        let Some(&pv) = self.vertices.get(v) else {
-            return;
-        };
         if self.curves.values().any(|c| c.chain.contains(&v)) {
             return;
         }
+        self.straighten(v, SKETCH_MERGE);
+    }
+
+    /// Join the two edges at `v` into one when `v` is at most `tol` off the straight line
+    /// between its neighbours and the straight edge keeps the graph's rules. True when done.
+    fn straighten(&mut self, v: SVertexId, tol: f64) -> bool {
+        let Some(&pv) = self.vertices.get(v) else {
+            return false;
+        };
         let incident: Vec<(SEdgeId, SVertexId)> = self
             .edges
             .iter()
@@ -1389,15 +1480,15 @@ impl Sketch {
             })
             .collect();
         let [(e1, u), (e2, w)] = incident[..] else {
-            return;
+            return false;
         };
         let (pu, pw) = (self.vertices[u], self.vertices[w]);
         let t = (pv - pu).dot(pw - pu) / pu.distance_squared(pw);
-        if t <= 0.0 || t >= 1.0 || point_segment_distance(pv, pu, pw) > SKETCH_MERGE {
-            return;
+        if t <= 0.0 || t >= 1.0 || point_segment_distance(pv, pu, pw) > tol {
+            return false;
         }
         if self.edge_between(u, w).is_some() {
-            return;
+            return false;
         }
         // The healed edge must keep the graph's rules (lane 23): `v` may sit up to the merge
         // distance off the straight line, so another point between the merge distance and
@@ -1413,11 +1504,12 @@ impl Sketch {
                 || !proper_cross(pu, pw, self.vertices[*a], self.vertices[*b])
         });
         if !clear {
-            return;
+            return false;
         }
         self.edges.remove(e2);
         self.edges[e1] = [u, w];
         self.vertices.remove(v);
+        true
     }
 
     /// Live regions of `self` that are new or whose boundary differs from `before`.
