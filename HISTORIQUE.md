@@ -543,3 +543,12 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 5 scénarios noyau (point aligné retiré d'un cube, coin refusé sans rien changer, nettoyage de deux points d'un coup puis rien, point d'esquisse à 1 cm de la ligne retiré et coin refusé, nettoyage d'une esquisse) ; 3 scénarios interface ; cargo 771, clippy et fmt propres ; vitest 1212, `tsc -b` et build propres avant l'envoi. Niveau : testé (banc : 8 scénarios). Non vérifié : sur le bâtiment 740C7886 de JC.
 - Limites connues : demande `npm run wasm`. Les doubles points très proches (deux murs à 1 cm l'un de l'autre, visibles sur la capture) ne sont pas des points entre deux arêtes alignées : ils restent ; c'est la jonction de GeoHVAC qui les produit (note Profondeur Alpha). Un point pris loin de l'origine (au-delà de quelques centaines de mètres) peut ne pas être reconnu.
+
+## H-20261119-4 · évolution · interface · Barre du bas : filtre de sélection et accrochages encadrés (E-51)
+
+- Origine : JC (19 nov. 2026, 13 h 41) : « je préférerais un menu sur l'écran de travail , dans la partie inférieure et des encadrés pour les différents choix » (captures : le filtre dans la rangée des onglets, la légende des accrochages en bas) ; E-51.
+- Fichiers : `src/components/Viewport.tsx` (`bottomLead` : ce qui précède les accrochages dans la barre du bas) ; `src/App.tsx` (le filtre et le panneau Point passent de la rangée des onglets à la barre du bas) ; `src/components/PointPanel.tsx` (titre « Select ») ; `src/styles/app.css` (barre du bas, groupes encadrés, un cadre par choix).
+- Évolution : en bas de la vue, trois groupes encadrés : Select (All, Points, Edges, Faces ; le choix actif en couleur), Point (X, Y, Z quand un point est choisi), Snap (les accrochages, chacun dans son cadre, barré quand il est coupé). À la largeur de l'écran de JC, tout tient sur une ligne ; plus étroit, la barre passe sur deux lignes.
+- Effet sur les projets : aucun.
+- Confidentialité : non.
+- Vérification : vitest 1212 (les tests du filtre et du panneau passent tels quels), `tsc -b` et build propres ; captures dans Chrome sans écran à 1500 et 1835 px de large (une ligne à 1835 px, rien ne chevauche le rappel des axes). Niveau : essayé (capture). Non vérifié : dans Firefox chez JC.

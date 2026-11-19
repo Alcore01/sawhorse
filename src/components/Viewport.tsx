@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { MeshData, MeshPart } from "../kernel/types";
 import { virtualShift } from "./KeyBar";
 import type { Vec3 } from "../lib/edit";
@@ -83,6 +83,9 @@ export interface ViewportProps {
   onEngine?: (engine: ViewportEngine | null) => void;
   /** sketchcraft E-16: the legend as snapping switches (absent: the plain legend). */
   snaps?: { on: (id: string) => boolean; toggle: (id: string) => void };
+  /** sketchcraft E-51: controls shown first in the bar along the bottom of the view (the
+   * selection filter, the Point panel), before the snapping switches. */
+  bottomLead?: ReactNode;
 }
 
 /** Read-only hooks for e2e tests and lane-end captures (scripts/capture*.mjs, e2e/*.spec.ts). */
@@ -336,7 +339,11 @@ export function Viewport(props: ViewportProps) {
       ) : null}
       {props.snaps ? (
         // sketchcraft E-16: the legend is the snapping switches (click to turn one off).
+        // E-51: in a bar along the bottom, after the selection filter, each choice boxed.
+        <div className="bottom-bar">
+          {props.bottomLead}
         <div className="legend snaps" role="group" aria-label="Snapping">
+          <b className="bar-title">Snap</b>
           {SNAP_SWITCHES.map((s) => {
             const on = props.snaps!.on(s.id);
             return (
@@ -350,6 +357,7 @@ export function Viewport(props: ViewportProps) {
             <i style={{ background: `var(${INFERENCE_STYLES["on-face"].token})` }}></i>
             {INFERENCE_STYLES["on-face"].label}
           </span>
+        </div>
         </div>
       ) : (
         <div className="legend">

@@ -3434,19 +3434,7 @@ export function App() {
         onUpdate={updateScene}
         onRename={renameScene}
         onDelete={deleteScene}
-        lead={
-          <>
-            <ModeSwitch mode={mode} onMode={setMode} sheets={scene?.sheets?.length ?? 0} />
-            <PickFilterSwitch
-              filter={pickFilter}
-              onFilter={(f) => {
-                setPickFilter(f);
-                setMessage({ text: f === "all" ? "Selection: anything." : f === "vertex" ? "Selection: points only. Click a point to see and edit its X, Y, Z." : f === "edge" ? "Selection: edges only." : "Selection: faces only.", error: false });
-              }}
-            />
-            {onePoint ? <PointPanel at={onePoint.at} units={units} onMove={(to) => void movePoint(onePoint.object, onePoint.at, to)} onError={(text) => setMessage({ text, error: true })} /> : null}
-          </>
-        }
+        lead={<ModeSwitch mode={mode} onMode={setMode} sheets={scene?.sheets?.length ?? 0} />}
       />
       {mode === "sheets" ? (
         <SheetsWorkspace
@@ -3487,6 +3475,18 @@ export function App() {
           setCamView(v);
           setProjection(p);
         }}
+        bottomLead={
+          <>
+            <PickFilterSwitch
+              filter={pickFilter}
+              onFilter={(f) => {
+                setPickFilter(f);
+                setMessage({ text: f === "all" ? "Selection: anything." : f === "vertex" ? "Selection: points only. Click a point to see and edit its X, Y, Z." : f === "edge" ? "Selection: edges only." : "Selection: faces only.", error: false });
+              }}
+            />
+            {onePoint ? <PointPanel at={onePoint.at} units={units} onMove={(to) => void movePoint(onePoint.object, onePoint.at, to)} onError={(text) => setMessage({ text, error: true })} /> : null}
+          </>
+        }
         snaps={{
           on: (id) => (id === "grid" ? snapGrid : !snapOff.includes(id)),
           toggle: (id) => {

@@ -15,7 +15,8 @@ const FILTERS: { id: PickFilter; label: string; title: string }[] = [
 
 export function PickFilterSwitch({ filter, onFilter }: { filter: PickFilter; onFilter: (f: PickFilter) => void }) {
   return (
-    <div className="mode-switch pick-filter" role="radiogroup" aria-label="Selection filter">
+    <div className="pick-filter" role="radiogroup" aria-label="Selection filter">
+      <b className="bar-title">Select</b>
       {FILTERS.map((f) => (
         <button key={f.id} type="button" role="radio" aria-checked={filter === f.id} data-filter={f.id} onClick={() => onFilter(f.id)} title={f.title}>
           {f.label}

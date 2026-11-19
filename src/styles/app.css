@@ -531,10 +531,21 @@ button.chip:hover{border-color:var(--accent)}
 .key-bar button[aria-pressed="true"] { background: var(--sel, #2c6fd1); color: #fff; }
 .key-bar button.close { min-width: 32px; opacity: 0.6; }
 /* sketchcraft E-49: the selection filter, the points shown in Points, the Point panel. */
-.mode-switch.pick-filter{margin-left:8px}
 .vp .vlabel.vdot{width:7px;height:7px;padding:0;border-radius:50%;border:1.5px solid var(--accent);background:var(--panel)}
-.point-panel{display:inline-flex;align-self:center;align-items:center;gap:8px;margin:0 8px 3px 0;padding:1px 8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font:12px var(--mono)}
 .point-panel strong{font-family:var(--display);text-transform:uppercase;font-size:11px;letter-spacing:.04em}
 .point-panel label{display:flex;align-items:center;gap:4px}
 .point-panel input{width:84px;font:12px var(--mono);padding:2px 4px;border:1px solid var(--line);border-radius:3px;background:var(--bg);color:var(--fg)}
 .point-panel .axis-x{color:#c0392b}.point-panel .axis-y{color:#27ae60}.point-panel .axis-z{color:#2e6fd8}
+/* sketchcraft E-51: the bar along the bottom of the view: the selection filter, the Point
+   panel and the snapping switches, each group framed and each choice in its own box. */
+.vp .bottom-bar{position:absolute;left:10px;right:190px;bottom:6px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;pointer-events:none}
+.vp .bottom-bar > *{pointer-events:auto}
+.vp .bottom-bar .legend{position:static}
+.bottom-bar .pick-filter,.bottom-bar .legend.snaps,.bottom-bar .point-panel{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:3px 5px;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:6px;font:10px var(--mono);color:var(--fg)}
+.bottom-bar .bar-title{font:600 10px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 3px 0 2px}
+.bottom-bar .pick-filter button,.bottom-bar .legend.snaps button,.bottom-bar .legend.snaps span{font:10px var(--mono);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:2px 7px;cursor:pointer}
+.bottom-bar .legend.snaps span{cursor:default;color:var(--muted)}
+.bottom-bar .pick-filter button[aria-checked="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.bottom-bar .legend.snaps button:hover,.bottom-bar .pick-filter button:hover{border-color:var(--accent)}
+.bottom-bar .legend.snaps button.off{opacity:.55;text-decoration:line-through;background:transparent}
+.point-panel strong{font-family:var(--display);text-transform:uppercase;font-size:10px;letter-spacing:.06em;color:var(--muted)}
