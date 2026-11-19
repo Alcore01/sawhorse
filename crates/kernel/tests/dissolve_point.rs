@@ -190,3 +190,32 @@ fn clean_sketch_points_removes_every_point_in_line() {
     assert_eq!(m.sketch(1).unwrap().edge_count(), 4);
     assert_eq!(m.sketch(1).unwrap().regions().count(), 1);
 }
+
+#[test]
+fn the_loose_end_of_a_line_takes_the_line_with_it() {
+    // sketchcraft E-54: a square with a stub line sticking out of one side.
+    let mut m = Model::with_ground_sketch();
+    m.apply(&Op::AddRectangle {
+        sketch: 1,
+        x: 0.0,
+        y: 0.0,
+        w: 1.0,
+        h: 1.0,
+    })
+    .unwrap();
+    m.apply(&Op::InsertSegment {
+        sketch: 1,
+        a: [1.0, 0.5],
+        b: [1.3, 0.5],
+    })
+    .unwrap();
+    let edges = |m: &Model| m.sketch(1).unwrap().edge_count();
+    assert_eq!(edges(&m), 6, "the side split at the stub, and the stub");
+    m.apply(&Op::DissolveSketchPoint {
+        sketch: 1,
+        at: [1.3, 0.5],
+    })
+    .unwrap();
+    assert_eq!(edges(&m), 4, "the stub went, and the side healed");
+    assert_eq!(m.sketch(1).unwrap().regions().count(), 1);
+}

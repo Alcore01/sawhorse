@@ -564,3 +564,14 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 5 scénarios noyau (arête entre deux faces coplanaires : fusion, volume gardé ; arête de coin : volume ouvert, 2 faces parties ; une face ; deux faces ensemble ; deux arêtes en une fois) ; tests interface mis à jour (4) ; cargo 776, clippy et fmt propres ; vitest 1212, `tsc -b` et build propres avant l'envoi. Niveau : testé (banc : 9 scénarios). Non vérifié : sur le bâtiment de JC ; les essais e2e (Playwright) non lancés ici.
 - Limites connues : demande `npm run wasm`. Une sélection qui mêle des arêtes et des faces d'un même volume ouvert par les arêtes est refusée en entier (effacer en deux fois).
+
+## H-20261119-6 · évolution · module · Le point au bout d'une ligne qui dépasse part avec elle (E-54)
+
+- Origine : JC (19 nov. 2026, 14 h 39), capture sans texte : faces éclatées, mode Points, « Can't do that. that point stays: it ends an edge (erase the edge instead) » ; E-54.
+- Constat : le point visé ne terminait qu'une seule arête dans sa face (un bout de ligne qui dépasse, tel qu'en laisse un effacement) ; E-50 ne retirait qu'un point entre deux arêtes.
+- Fichiers : `crates/kernel/src/sketch.rs` (`dissolve_point` : un point au bout d'une ligne efface la ligne, comme la Gomme, et ressoude ce qui était coupé à son autre bout ; un point seul part) ; `crates/kernel/tests/dissolve_point.rs` (1 scénario).
+- Évolution : Suppr ou Gomme sur l'extrémité libre d'une ligne : la ligne part ; un point isolé part. Un point de trois arêtes ou plus, un point d'arc, un coin restent, avec la raison.
+- Effet sur les projets : aucun hors des effacements faits.
+- Confidentialité : non.
+- Vérification : 1 scénario (carré avec une ligne qui dépasse : supprimer son bout efface la ligne et le côté redevient une seule arête) ; cargo 777, clippy et fmt propres ; vitest 1212. Niveau : testé (banc : 1 scénario). Non vérifié : sur le modèle de JC ; je n'ai pas la certitude que c'était un bout de ligne (déduit du message).
+- Limites connues : demande `npm run wasm`. Avec plusieurs points sélectionnés, un seul refus fait refuser l'ensemble (les supprimer un à un).

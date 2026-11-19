@@ -1368,9 +1368,10 @@ impl Sketch {
 
     /// sketchcraft E-50: remove the point at `p` (within the merge distance) that joins
     /// exactly two edges running nearly straight through it (it is at most `tol` off the line
-    /// between its neighbours): the two edges become one. Refused, with the reason, for a
-    /// corner, a point of three edges or more, a curve's point, or where the straight edge
-    /// would touch other geometry. Returns the live regions that changed.
+    /// between its neighbours): the two edges become one. The loose end of a line takes the
+    /// line with it (E-54); a lone point goes. Refused, with the reason, for a point of three
+    /// edges or more, a curve's point, or a corner (or where the straight edge would touch
+    /// other geometry). Returns the live regions that changed.
     pub fn dissolve_point(&mut self, p: DVec2, tol: f64) -> Result<Vec<RegionId>, SketchError> {
         if !(in_bounds(p.x) && in_bounds(p.y)) {
             return Err(SketchError::OutOfBounds);
@@ -1385,18 +1386,36 @@ impl Sketch {
                 "there is no point of this sketch there",
             ));
         };
-        let degree = self.edges.values().filter(|e| e.contains(&v)).count();
-        if degree != 2 {
-            return Err(SketchError::PointStays(if degree > 2 {
-                "it joins three edges or more (only a point between two edges can go)"
-            } else {
-                "it ends an edge (erase the edge instead)"
-            }));
+        let ends: Vec<SVertexId> = self
+            .edges
+            .values()
+            .filter(|e| e.contains(&v))
+            .map(|e| if e[0] == v { e[1] } else { e[0] })
+            .collect();
+        if ends.len() > 2 {
+            return Err(SketchError::PointStays(
+                "it joins three edges or more (only a point between two edges can go)",
+            ));
         }
         if self.curves.values().any(|c| c.chain.contains(&v)) {
             return Err(SketchError::PointStays(
                 "it is a point of a curve (Explode Curve first)",
             ));
+        }
+        // sketchcraft E-54: the loose end of a line (a stub left over, often by an erase):
+        // the line goes with it; a point alone goes.
+        if let [u] = ends[..] {
+            let (pv, pu) = (self.vertices[v], self.vertices[u]);
+            return self.erase_segment(pv, pu);
+        }
+        if ends.is_empty() {
+            let mut next = self.clone();
+            next.vertices.remove(v);
+            next.settle();
+            next.debug_check("dissolve_point");
+            let changed = next.changed_regions(self);
+            *self = next;
+            return Ok(changed);
         }
         let mut next = self.clone();
         if !next.straighten(v, tol) {
