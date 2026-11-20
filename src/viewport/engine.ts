@@ -1927,6 +1927,17 @@ varying float vOwnerState;`,
     return this.controls.state();
   }
 
+  /** sketchcraft E-55: the world axes in camera space (x right, y up, z toward the eye), for
+   * the axes in the corner of the view. */
+  axisFrame(): { x: Vec3; y: Vec3; z: Vec3 } {
+    const q = this.camera.quaternion.clone().invert();
+    const v = (a: [number, number, number]): Vec3 => {
+      const w = new THREE.Vector3(...a).applyQuaternion(q);
+      return [w.x, w.y, w.z];
+    };
+    return { x: v([1, 0, 0]), y: v([0, 1, 0]), z: v([0, 0, 1]) };
+  }
+
   /** Is world point `p` hidden behind a face nearer the eye? (screen-space helpers) */
   occluded(p: Vec3): boolean {
     if (!this.faces) return false;

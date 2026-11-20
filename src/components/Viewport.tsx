@@ -6,6 +6,7 @@ import { INFERENCE_STYLES, LEGEND_KINDS, SNAP_SWITCHES, type InferenceKind } fro
 import { isMacControlClick } from "../lib/platform";
 import type { UnitSystem } from "../lib/units";
 import { NO_HIGHLIGHT, ViewportEngine, webgl2Available, type Highlight, type OverlayItem, type Projection, type ViewId } from "../viewport/engine";
+import { gizmoDots } from "../lib/axisGizmo";
 
 export type KernelState = "loading" | "ready" | "missing" | "error";
 
@@ -86,6 +87,8 @@ export interface ViewportProps {
   /** sketchcraft E-51: controls shown first in the bar along the bottom of the view (the
    * selection filter, the Point panel), before the snapping switches. */
   bottomLead?: ReactNode;
+  /** sketchcraft E-55: a click on the axes in the corner: look from that side. */
+  onAxisView?: (view: ViewId) => void;
 }
 
 /** Read-only hooks for e2e tests and lane-end captures (scripts/capture*.mjs, e2e/*.spec.ts). */
@@ -370,6 +373,38 @@ export function Viewport(props: ViewportProps) {
         </div>
       )}
       <div className="axes">x ─ red · y ─ green · z ─ blue</div>
+      {engine ? <AxisGizmo frame={engine.axisFrame()} onView={props.onAxisView} /> : null}
     </main>
+  );
+}
+
+/** sketchcraft E-55: the axes in the top right corner, turning with the camera; a click on a
+ * dot looks from that side (X: Right, -X: Left, Y: Back, -Y: Front, Z: Top, -Z: Bottom). */
+function AxisGizmo({ frame, onView }: { frame: { x: Vec3; y: Vec3; z: Vec3 }; onView?: (view: ViewId) => void }) {
+  const size = 96;
+  const c = size / 2;
+  const r = 32;
+  const dots = gizmoDots(frame, r);
+  const names: Record<string, string> = { right: "Right", left: "Left", back: "Back", front: "Front", top: "Top", bottom: "Bottom" };
+  return (
+    <svg className="axis-gizmo" data-testid="axis-gizmo" width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="group" aria-label="Axes">
+      <circle cx={c} cy={c} r={c - 2} className="axis-gizmo-bg" />
+      {dots
+        .filter((d) => d.positive)
+        .map((d) => (
+          <line key={`l${d.id}`} x1={c} y1={c} x2={c + d.x} y2={c + d.y} stroke={d.color} strokeWidth={2.5} strokeLinecap="round" />
+        ))}
+      {dots.map((d) => (
+        <g key={d.id} className="axis-dot" role="button" aria-label={`${d.positive ? "" : "minus "}${d.id.replace("-", "").toUpperCase()}: ${names[d.view]} view`} onClick={() => onView?.(d.view)}>
+          <title>{`${d.positive ? "+" : "−"}${d.id.replace("-", "").toUpperCase()}: look from this side (${names[d.view]})`}</title>
+          <circle cx={c + d.x} cy={c + d.y} r={d.positive ? 9 : 7} fill={d.positive ? d.color : "var(--panel)"} fillOpacity={d.positive ? 1 : 0.85} stroke={d.color} strokeWidth={2} />
+          {d.label ? (
+            <text x={c + d.x} y={c + d.y} dy="0.35em" textAnchor="middle" className="axis-letter">
+              {d.label}
+            </text>
+          ) : null}
+        </g>
+      ))}
+    </svg>
   );
 }

@@ -549,3 +549,9 @@ button.chip:hover{border-color:var(--accent)}
 .bottom-bar .legend.snaps button:hover,.bottom-bar .pick-filter button:hover{border-color:var(--accent)}
 .bottom-bar .legend.snaps button.off{opacity:.55;text-decoration:line-through;background:transparent}
 .point-panel strong{font-family:var(--display);text-transform:uppercase;font-size:10px;letter-spacing:.06em;color:var(--muted)}
+/* sketchcraft E-55: the axes in the top right corner of the view. */
+.vp .axis-gizmo{position:absolute;top:10px;right:10px;z-index:4;cursor:pointer;user-select:none}
+.vp .axis-gizmo .axis-gizmo-bg{fill:color-mix(in srgb,var(--panel) 35%,transparent);stroke:none;transition:fill .15s}
+.vp .axis-gizmo:hover .axis-gizmo-bg{fill:color-mix(in srgb,var(--panel) 75%,transparent)}
+.vp .axis-gizmo .axis-dot:hover circle{stroke:var(--fg);stroke-width:2.5}
+.vp .axis-gizmo .axis-letter{font:700 10px var(--mono);fill:#fff;pointer-events:none}

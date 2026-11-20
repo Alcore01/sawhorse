@@ -3482,6 +3482,7 @@ export function App() {
           setCamView(v);
           setProjection(p);
         }}
+        onAxisView={setView}
         bottomLead={
           <>
             <PickFilterSwitch

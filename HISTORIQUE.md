@@ -575,3 +575,13 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 1 scénario (carré avec une ligne qui dépasse : supprimer son bout efface la ligne et le côté redevient une seule arête) ; cargo 777, clippy et fmt propres ; vitest 1212. Niveau : testé (banc : 1 scénario). Non vérifié : sur le modèle de JC ; je n'ai pas la certitude que c'était un bout de ligne (déduit du message).
 - Limites connues : demande `npm run wasm`. Avec plusieurs points sélectionnés, un seul refus fait refuser l'ensemble (les supprimer un à un).
+
+## H-20261120-1 · évolution · interface · Repère des axes dans le coin de la vue (E-55)
+
+- Origine : JC (20 nov. 2026, 14 h 17) : « il manque une gestion des axes dans le coin supérieur droit de la vue » (deux captures : le repère de Blender, la vue de VolumeCraft) ; E-55.
+- Fichiers : `src/lib/axisGizmo.ts` (nouveau : `gizmoDots`, place des six pastilles d'après la caméra, la plus proche dessinée en dernier) et son test (3 scénarios) ; `src/viewport/engine.ts` (`axisFrame` : les axes du monde vus par la caméra) ; `src/components/Viewport.tsx` (`AxisGizmo`, `onAxisView`) ; `src/App.tsx` (clic → `setView`) ; `src/styles/app.css`.
+- Évolution : en haut à droite de la vue, X rouge, Y vert, Z bleu en pastilles pleines avec leur lettre, leurs opposés en cercles ; le repère suit l'orbite. Un clic : X → Right, −X → Left, Y → Back, −Y → Front, Z → Top, −Z → Bottom (vue depuis ce côté, comme Blender).
+- Écarté : tourner la vue en glissant sur le repère (non demandé ; l'orbite reste à la souris).
+- Effet sur les projets : aucun.
+- Confidentialité : non.
+- Vérification : 3 scénarios ; vitest, `tsc -b` et build propres ; dans Chrome sans écran : le repère en vue Persp, un clic sur Z donne la vue Top (data-view = top) et le repère montre Z face à l'œil, X à droite, Y en haut. Niveau : essayé (capture). Non vérifié : dans Firefox chez JC.
