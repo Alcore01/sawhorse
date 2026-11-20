@@ -72,6 +72,9 @@ import { NameDialog, type NameRequest } from "./components/NameDialog";
 import { parseAlong } from "./lib/extrudeAlong";
 import { facadeAngle, planCentre, solidEdges, wallAngle } from "./lib/align";
 import { meshPoints, type PickFilter } from "./lib/pickFilter";
+import { selectionInfo } from "./lib/properties";
+import { viewMenuItems, viewMenuLabels } from "./lib/viewMenu";
+import { ViewMenu } from "./components/ViewMenu";
 import { PickFilterSwitch, PointPanel } from "./components/PointPanel";
 import { rotation, translation } from "./tools/xform";
 import { APP_NAME } from "./lib/brand";
@@ -387,6 +390,8 @@ export function App() {
   const afterHistoryRef = useRef<() => void>(() => undefined);
   const [selection, setSelection] = useState<Entity[]>([]);
   const [hover, setHover] = useState<Entity | null>(null);
+  const hoverRef = useRef<Entity | null>(null);
+  hoverRef.current = hover;
   const [target, setTarget] = useState<Target | null>(null);
   /** Lane 43 (#7): where the last op that landed went from and to ({@link stepKey}), and
    * Push/Pull's target before it, for the tool host's rememberSelection. */
@@ -2057,6 +2062,22 @@ export function App() {
     });
   }, [apply]);
 
+  /** sketchcraft E-56: what the selection measures, for the Info pane. */
+  const infoSheet = useMemo(() => selectionInfo(selection, scene?.mesh ?? null, scene?.state ?? null, units), [selection, scene?.mesh, scene?.state, units]);
+  const [focusInfo, setFocusInfo] = useState(0);
+  /** sketchcraft E-57: the view's right-click menu, where it opened. */
+  const [viewMenu, setViewMenu] = useState<{ x: number; y: number } | null>(null);
+  const onRightClick = useCallback((x: number, y: number) => {
+    // What is under the cursor, when it is not already selected, becomes the selection.
+    const h = hoverRef.current;
+    const sel = live.current.selection;
+    if (h && !sel.some((e) => entityKey(e) === entityKey(h))) {
+      live.current.selection = [h];
+      setSelection([h]);
+    }
+    setViewMenu({ x, y });
+  }, []);
+
   /** sketchcraft E-49: the one selected point of a solid, for the Point panel. */
   const onePoint = useMemo(() => {
     const e = selection.length === 1 ? selection[0] : null;
@@ -3483,6 +3504,7 @@ export function App() {
           setProjection(p);
         }}
         onAxisView={setView}
+        onRightClick={onRightClick}
         bottomLead={
           <>
             <PickFilterSwitch
@@ -3532,12 +3554,24 @@ export function App() {
           }}
         />
       ) : null}
+      {viewMenu ? (
+        <ViewMenu
+          x={viewMenu.x}
+          y={viewMenu.y}
+          items={viewMenuItems(viewMenuLabels(new Set(selection.map((e) => e.kind))), menus, {
+            Properties: { label: "Properties", title: "Open the Info pane: areas, volume, orientation", onSelect: () => setFocusInfo((n) => n + 1) },
+          })}
+          onClose={() => setViewMenu(null)}
+        />
+      ) : null}
       <SidePanel
         credits={credits}
         renderOn={renderOn}
         capture={capture}
         focusRender={renderFocus}
         focusTags={focusTags}
+        info={{ sheet: infoSheet }}
+        focusInfo={focusInfo}
         onPane={setPane}
         plugins={plugins.pane}
         focusPlugins={focusPlugins}

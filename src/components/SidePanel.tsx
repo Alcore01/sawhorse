@@ -3,6 +3,7 @@ import { CutListPane, type CutListPaneProps } from "./CutListPane";
 import type { CreditsHandle } from "../credits/useCredits";
 import type { RenderPasses } from "../render/passes";
 import { MaterialsPane, type MaterialsPaneProps } from "./MaterialsPane";
+import { InfoPane, type InfoPaneProps } from "./InfoPane";
 import { Outliner, type OutlinerProps } from "./Outliner";
 import { PluginsPane, type PluginsPaneProps } from "./PluginsPane";
 import { PLUGIN_GLYPH } from "./glyphs";
@@ -14,7 +15,7 @@ import { TagsPane, type TagsPaneProps } from "./TagsPane";
 // Tags panes (lane 5), the Cut list (lane 7) and the Render pane (lane 8) are all live;
 // Materials and Styles (with the sun) came in lane 10.
 
-export type PaneId = "outliner" | "tags" | "cutlist" | "materials" | "styles" | "render" | "plugins";
+export type PaneId = "outliner" | "info" | "tags" | "cutlist" | "materials" | "styles" | "render" | "plugins";
 
 /** Lane 20b: the panel's usual width (px), 360 (the mock's 300 left the Cut list's Part
  * column about 35 px); wider or narrower by dragging its left edge (or the arrow keys on it),
@@ -63,6 +64,7 @@ const windowWidth = () => (typeof window === "undefined" ? 1440 : window.innerWi
 // Plugins (lane 11) is a glyph tab at the end, so the named tabs keep the mock's widths.
 const TABS: { id: PaneId; label: string; glyph?: boolean }[] = [
   { id: "outliner", label: "Outliner" },
+  { id: "info", label: "Info" },
   { id: "tags", label: "Tags" },
   { id: "cutlist", label: "Cut list" },
   { id: "materials", label: "Materials" },
@@ -80,6 +82,10 @@ export interface SidePanelProps {
   /** Bumped to bring the Render pane forward (the Credits chip). */
   focusRender?: number;
   outliner: OutlinerProps;
+  /** sketchcraft E-56: what the selection measures. */
+  info: InfoPaneProps;
+  /** Bumped to bring the Info pane forward (the view's right-click menu, Properties). */
+  focusInfo?: number;
   tags: TagsPaneProps;
   /** Bumped to bring the Tags pane forward (a tag just created from elsewhere). */
   focusTags?: number;
@@ -95,7 +101,7 @@ export interface SidePanelProps {
   onPane?: (pane: PaneId) => void;
 }
 
-export function SidePanel({ credits, renderOn = true, capture, focusRender = 0, outliner, tags, focusTags = 0, cutlist, materials, styles, focusMaterials = 0, plugins, focusPlugins = 0, onPane }: SidePanelProps) {
+export function SidePanel({ credits, renderOn = true, capture, focusRender = 0, outliner, info, focusInfo = 0, tags, focusTags = 0, cutlist, materials, styles, focusMaterials = 0, plugins, focusPlugins = 0, onPane }: SidePanelProps) {
   const [pane, setPane] = useState<PaneId>("outliner");
   // Lane 20: the panel's width, dragged on its left edge or set by the Cut list's Wide.
   const [width, setWidthState] = useState(() => clampSideWidth(storedSideWidth(), windowWidth()));
@@ -155,6 +161,9 @@ export function SidePanel({ credits, renderOn = true, capture, focusRender = 0, 
   useEffect(() => {
     if (focusTags > 0) setPane("tags");
   }, [focusTags]);
+  useEffect(() => {
+    if (focusInfo > 0) setPane("info");
+  }, [focusInfo]);
   useEffect(() => {
     if (focusMaterials > 0) setPane("materials");
   }, [focusMaterials]);
@@ -237,6 +246,13 @@ export function SidePanel({ credits, renderOn = true, capture, focusRender = 0, 
         </h3>
         <Outliner {...outliner} />
         <p className="note">Double-click in the model to edit in place (Esc leaves). Double-click a name to rename. Right-click for Make Group, Make Component, Make Unique, Explode, Lock.</p>
+      </section>
+
+      <section className="pane" id="pane-info" role="tabpanel" aria-labelledby="tab-info" hidden={pane !== "info"}>
+        <h3>
+          Info <small>what the selection measures</small>
+        </h3>
+        <InfoPane {...info} />
       </section>
 
       <section className="pane" id="pane-tags" role="tabpanel" aria-labelledby="tab-tags" hidden={pane !== "tags"}>

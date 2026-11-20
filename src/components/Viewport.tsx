@@ -89,6 +89,9 @@ export interface ViewportProps {
   bottomLead?: ReactNode;
   /** sketchcraft E-55: a click on the axes in the corner: look from that side. */
   onAxisView?: (view: ViewId) => void;
+  /** sketchcraft E-57: a right click that did not drag (a drag pans): the menu at the pointer
+   * (page coordinates). */
+  onRightClick?: (x: number, y: number) => void;
 }
 
 /** Read-only hooks for e2e tests and lane-end captures (scripts/capture*.mjs, e2e/*.spec.ts). */
@@ -122,6 +125,8 @@ export interface SawhorseHooks {
 
 export function Viewport(props: ViewportProps) {
   const { mesh, units, view, viewSeq, projection, fitSeq, hud, kernel, info, highlight, overlay, marker, labels, box, cursor, selectionCount, hoverKind, onPointer, onCamera, onEngine } = props;
+  // sketchcraft E-57: where the right button went down (a right click opens the menu).
+  const rightDown = useRef<{ x: number; y: number } | null>(null);
   const hostRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<ViewportEngine | null>(null);
@@ -289,9 +294,17 @@ export function Viewport(props: ViewportProps) {
         onPointerMove={(e) => send("move", e)}
         onPointerDown={(e) => {
           if (e.button === 1) e.preventDefault(); // no autoscroll on middle press
+          if (e.button === 2) rightDown.current = { x: e.clientX, y: e.clientY };
           send("down", e);
         }}
-        onPointerUp={(e) => send("up", e)}
+        onPointerUp={(e) => {
+          const r = rightDown.current;
+          if (e.button === 2 && r) {
+            rightDown.current = null;
+            if (Math.hypot(e.clientX - r.x, e.clientY - r.y) < 5) props.onRightClick?.(e.clientX, e.clientY);
+          }
+          send("up", e);
+        }}
         onDoubleClick={(e) => send("dblclick", e)}
         onPointerLeave={(e) => send("leave", e)}
         onContextMenu={(e) => e.preventDefault()}

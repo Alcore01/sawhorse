@@ -283,7 +283,7 @@ describe("App shell", () => {
     render(<App />);
     await screen.findByRole("tab", { name: "Render" });
     const tabs = screen.getAllByRole("tab").map((t) => t.getAttribute("aria-label") ?? t.textContent);
-    expect(tabs).toEqual(["Outliner", "Tags", "Cut list", "Materials", "Styles", "Render", "Plugins"]);
+    expect(tabs).toEqual(["Outliner", "Info", "Tags", "Cut list", "Materials", "Styles", "Render", "Plugins"]);
     expect(screen.getByText("Credits")).toBeTruthy();
     // No example content: an empty model has an empty Outliner, and Tags has its default.
     expect(screen.queryByText("Side L")).toBeNull();
@@ -311,7 +311,7 @@ describe("App shell", () => {
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("offline")));
     render(<App />);
     expect(screen.queryByText("Credits")).toBeNull();
-    expect(screen.getAllByRole("tab").map((t) => t.getAttribute("aria-label") ?? t.textContent)).toEqual(["Outliner", "Tags", "Cut list", "Materials", "Styles", "Plugins"]);
+    expect(screen.getAllByRole("tab").map((t) => t.getAttribute("aria-label") ?? t.textContent)).toEqual(["Outliner", "Info", "Tags", "Cut list", "Materials", "Styles", "Plugins"]);
     // Edit > Settings…
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /Settings/ }));
