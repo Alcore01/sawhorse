@@ -130,7 +130,16 @@ export type Subject =
       sketches?: SketchPart[];
     }
   /** Part of one solid: its points (a face's corners, an edge's ends, a vertex). */
-  | { kind: "geometry"; object: number; points: V3[]; what: string; sketches?: SketchPart[] };
+  | {
+      kind: "geometry";
+      object: number;
+      points: V3[];
+      what: string;
+      sketches?: SketchPart[];
+      /** sketchcraft E-58: the selected faces' outlines (world rings), for a copy (Ctrl):
+       * a copy of a face of a solid is its outline, drawn as a flat face where it lands. */
+      faceRings?: V3[][][];
+    };
 
 /** An entity that is sketch geometry: a region, or a sketch's edge, point or curve. */
 export function isSketchEntity(e: Entity): boolean {
@@ -456,11 +465,14 @@ export function subjectOf(selection: Entity[], picked: Entity | null, outlines: 
     };
     let faces = 0;
     let what = "";
+    const faceRings: V3[][][] = [];
     for (const e of rest) {
       if (e.kind === "face") {
         faces++;
         what = faceOf(e.object, e.face);
-        for (const ring of outlines.get(`${e.object}:${e.face}`) ?? []) ring.forEach(push);
+        const rings = outlines.get(`${e.object}:${e.face}`) ?? [];
+        if (rings.length) faceRings.push(rings);
+        for (const ring of rings) ring.forEach(push);
       } else if (e.kind === "edge") {
         push(e.a);
         push(e.b);
@@ -476,7 +488,7 @@ export function subjectOf(selection: Entity[], picked: Entity | null, outlines: 
     }
     if (!points.length) return "Nothing to move there.";
     if (rest.length > 1) what = faces > 1 ? `${faces} faces of ${solidName(object)}` : `${rest.length} parts of ${solidName(object)}`;
-    return withSketches({ kind: "geometry", object, points, what });
+    return withSketches({ kind: "geometry", object, points, what, ...(faceRings.length ? { faceRings } : {}) });
   }
   if (picked && state) {
     const unit = scopeEntity(picked, state);

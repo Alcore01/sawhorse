@@ -7,7 +7,9 @@ export type BuiltinToolId =
   | "pushpull" | "pushaxis" | "move" | "rotate" | "scale" | "offset" | "follow"
   | "tape" | "protractor" | "dim" | "paint"
   | "section"
-  | "orbit" | "pan";
+  | "orbit" | "pan"
+  // sketchcraft E-58: placing what Edit > Paste carries (no rail button, no key).
+  | "paste";
 
 /** A plugin's tool (lane 11): `plugin:<plugin id>/<tool id>`. */
 export type PluginToolId = `plugin:${string}`;
@@ -74,7 +76,9 @@ export const TOOL_GROUPS: ToolDef[][] = [
 export const TOOLS: ToolDef[] = TOOL_GROUPS.flat();
 
 const BY_KEY = new Map(TOOLS.filter((t) => t.key).map((t) => [t.key, t]));
-const BY_ID = new Map(TOOLS.map((t) => [t.id, t]));
+const BY_ID = new Map<ToolId, ToolDef>(TOOLS.map((t) => [t.id, t]));
+// sketchcraft E-58: Paste's placement, reached from Edit > Paste (Ctrl+V), not the rail.
+BY_ID.set("paste", { id: "paste", label: "Paste", key: "", keyCap: "", hint: "Click where the pasted thing's lowest corner goes. Esc cancels.", vcb: null });
 
 export function toolForKey(key: string): ToolDef | undefined {
   return BY_KEY.get(key.length === 1 ? key.toLowerCase() : key);

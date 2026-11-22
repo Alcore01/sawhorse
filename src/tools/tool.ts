@@ -134,6 +134,8 @@ export interface ToolHost {
   connectedFaces?(sketch: number, region: number): Promise<[number, number][]>;
   /** sketchcraft E-49: the selection filter (Points, Edges, Faces; "all" when absent). */
   pickFilter?(): PickFilter;
+  /** sketchcraft E-58: the tool's job is done: back to Select. */
+  done?(): void;
   /** World rings of a face or region, or (lane 23) a curve's points as one ring (empty when
    * it is gone). */
   outline(t: OutlineTarget): Promise<V3[][]>;

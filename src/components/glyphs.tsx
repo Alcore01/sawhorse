@@ -30,6 +30,7 @@ export const TOOL_GLYPHS: Record<BuiltinToolId, ReactElement> = {
     </>
   ),
   move: <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />,
+  paste: <path d="M8 4h8v3H8zM6 6H5v15h14V6h-1M9 13h6M12 10v6" />,
   rotate: (
     <>
       <path d="M20 12a8 8 0 1 1-8-8" />

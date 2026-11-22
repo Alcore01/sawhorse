@@ -27,7 +27,7 @@ import { useRenderGate } from "./credits/gate";
 import { SettingsDialog } from "./components/SettingsDialog";
 import type { DocState, Entity, KernelOp, MeshData, SceneData, V3 } from "./kernel/types";
 import { describeTarget, nextTarget, type Target } from "./lib/edit";
-import { entityKey, erasedWords, eraseOps, partsOf, selectionHighlight, selectionLookup, withHover } from "./lib/entities";
+import { entityKey, erasedWords, eraseOps, objectEdges, partsOf, selectionHighlight, selectionLookup, withHover } from "./lib/entities";
 import { thumbnailUrl } from "./lib/thumbnail";
 import { contextTrail, describeNode, entityShown, graphIndex, graphOf, nodeById, objectParent, quoted, scopeEntity, solidsIn } from "./lib/scope";
 import { meshIndex } from "./lib/meshIndex";
@@ -74,6 +74,7 @@ import { facadeAngle, planCentre, solidEdges, wallAngle } from "./lib/align";
 import { meshPoints, type PickFilter } from "./lib/pickFilter";
 import { selectionInfo } from "./lib/properties";
 import { viewMenuItems, viewMenuLabels } from "./lib/viewMenu";
+import { PasteTool, anchorOf, type Clip } from "./tools/paste";
 import { ViewMenu } from "./components/ViewMenu";
 import { PickFilterSwitch, PointPanel } from "./components/PointPanel";
 import { rotation, translation } from "./tools/xform";
@@ -374,6 +375,10 @@ export function App() {
   // sketchcraft E-49: the selection filter (read by the Select tool through the host).
   const [pickFilter, setPickFilter] = useState<PickFilter>("all");
   const pickFilterRef = useRef<PickFilter>("all");
+  /** sketchcraft E-58: a tool's job done (Paste placed): back to Select. Set below. */
+  const doneRef = useRef<(() => void) | null>(null);
+  /** sketchcraft E-58: what Edit > Copy took. */
+  const clipRef = useRef<Clip | null>(null);
   pickFilterRef.current = pickFilter;
   const [scene, setScene] = useState<SceneData | null>(null);
   const [kernelState, setKernelState] = useState<KernelState>("loading");
@@ -1427,6 +1432,7 @@ export function App() {
         stepSelections.current = [...stepSelections.current.filter((s) => s.from !== step.from || s.to !== step.to).slice(-199), step];
       },
       pickFilter: () => pickFilterRef.current,
+      done: () => doneRef.current?.(),
       connectedFaces: async (sketch, region) => {
         const k = kernelRef.current;
         if (!k) return [];
@@ -1545,6 +1551,7 @@ export function App() {
       ["section", new SectionTool(host)],
       ["orbit", new OrbitTool(host)],
       ["pan", new PanTool(host)],
+      ["paste", new PasteTool(host)],
     ]);
   }
   const toolFor = (id: ToolId): Tool | null => toolsRef.current?.get(id) ?? pluginsRef.current?.toolFor(id) ?? null;
@@ -1690,6 +1697,41 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [defaultValue],
   );
+  doneRef.current = () => selectTool("select");
+
+  /** sketchcraft E-58: Edit > Copy (Ctrl+C): what is selected, for Edit > Paste. Solids,
+   * groups and components by id; faces and loose faces as their outline; edges as lines. */
+  const copySelection = useCallback(async () => {
+    const sel = live.current.selection;
+    const mesh = live.current.scene?.mesh ?? null;
+    if (!sel.length || !mesh) return void setMessage({ text: "Select what to copy first.", error: true });
+    const objects = [...new Set(sel.flatMap((e) => (e.kind === "object" ? [e.object] : [])))];
+    const nodes = [...new Set(sel.flatMap((e) => (e.kind === "node" ? [e.node] : [])))];
+    const faces: Clip["faces"] = [];
+    for (const e of sel) {
+      if (e.kind !== "face" && e.kind !== "region") continue;
+      const rings = await host.outline(e.kind === "face" ? { kind: "face", object: e.object, face: e.face } : { kind: "region", sketch: e.sketch, region: e.region });
+      const part = mesh.parts.find((p) => (e.kind === "face" ? p.kind === "face" && p.owner === e.object && p.index === e.face : p.kind === "region" && p.owner === e.sketch && p.index === e.region));
+      if (rings.length && part) faces.push({ rings, normal: part.normal });
+    }
+    const segments: [V3, V3][] = sel.flatMap((e) => (e.kind === "edge" && !(e.owner.kind === "object" && objects.includes(e.owner.id)) ? [[e.a, e.b] as [V3, V3]] : []));
+    const inNodes = [...new Set(nodes.flatMap((n) => partsOf({ kind: "node", node: n }, mesh, live.current.scene?.state.graph).flatMap((i) => (mesh.parts[i]?.kind === "face" ? [mesh.parts[i].owner] : []))))];
+    const preview: [V3, V3][] = [...[...objects, ...inNodes].flatMap((o) => objectEdges(o, mesh)), ...faces.flatMap((f) => f.rings.flatMap((r) => r.map((p, k) => [p, r[(k + 1) % r.length]] as [V3, V3]))), ...segments];
+    if (!preview.length) return void setMessage({ text: "Copy takes solids, groups, components, faces and edges.", error: true });
+    const parts = [objects.length ? plural(objects.length, "solid") : "", nodes.length ? plural(nodes.length, "group") : "", faces.length ? (faces.length === 1 ? "the outline of a face" : `the outlines of ${faces.length} faces`) : "", segments.length ? plural(segments.length, "edge") : ""].filter(Boolean);
+    clipRef.current = { objects, nodes, faces, segments, preview, anchor: anchorOf(preview.flat()), what: parts.join(", ") };
+    setMessage({ text: `Copied ${clipRef.current.what}. Edit > Paste (Ctrl+V), then click where it goes.`, error: false });
+  }, [host]);
+
+  /** sketchcraft E-58: Edit > Paste (Ctrl+V): what was copied follows the cursor; a click
+   * puts it down. */
+  const pasteClip = useCallback(() => {
+    const c = clipRef.current;
+    if (!c) return void setMessage({ text: "Nothing to paste: select something and Edit > Copy (Ctrl+C) first.", error: true });
+    (toolsRef.current?.get("paste") as PasteTool | undefined)?.setClip(c);
+    selectTool("paste");
+  }, [selectTool]);
+
   selectToolRef.current = selectTool;
 
 
@@ -2806,6 +2848,16 @@ export function App() {
           return;
         }
         if (sheetsMode) return;
+        if (k === "c" && !e.shiftKey && !inVcb && !isEditableText(e.target)) {
+          e.preventDefault();
+          void afterPointer(() => void copySelection());
+          return;
+        }
+        if (k === "v" && !e.shiftKey && !inVcb && !isEditableText(e.target)) {
+          e.preventDefault();
+          void afterPointer(pasteClip);
+          return;
+        }
         if (k === "a" && !inVcb) {
           e.preventDefault();
           void afterPointer(selectAll);
@@ -2959,7 +3011,7 @@ export function App() {
       window.removeEventListener("pointerdown", onPress, true);
       window.removeEventListener("blur", onPress);
     };
-  }, [selectTool, undo, redo, zoomExtents, eraseSelection, selectAll, afterPointer, save, openDialog, importDialog, makeGroup, explode]);
+  }, [selectTool, undo, redo, zoomExtents, eraseSelection, selectAll, afterPointer, save, openDialog, importDialog, makeGroup, explode, copySelection, pasteClip]);
 
   // Lane 24 (issue #13): the unit chip opens a picker (it used to cycle), the status line
   // names the units on an empty document, and Edit > Units lists the same choices.
@@ -3153,6 +3205,9 @@ export function App() {
       Edit: [
         { label: `Undo${stepName(st?.undo_depth, st?.stats.hash) ? ` ${stepName(st?.undo_depth, st?.stats.hash)}` : ""}`, keys: "Ctrl+Z", disabled: !st?.can_undo, onSelect: () => void undo() },
         { label: "Redo", keys: "Ctrl+Y", disabled: !st?.can_redo, onSelect: () => void redo() },
+        "-",
+        { label: "Copy", keys: "Ctrl+C", title: "sketchcraft: copy the selection (solids, groups, faces as outlines, edges) to paste elsewhere", disabled: !selection.length, onSelect: () => void copySelection() },
+        { label: "Paste", keys: "Ctrl+V", title: "sketchcraft: what was copied follows the cursor; click where its lowest corner goes", onSelect: pasteClip },
         "-",
         { label: "Select All", keys: "Ctrl+A", onSelect: selectAll },
         ...(selection.length === 1 && selection[0].kind === "section"
@@ -3365,7 +3420,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, alignFacade, cleanPoints, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, alignFacade, cleanPoints, copySelection, pasteClip, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;

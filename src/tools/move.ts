@@ -61,8 +61,39 @@ const MIN_MOVE = 1e-5;
 /** The ops for a move of `subject` by `delta`, as a copy or an array of `count` copies. */
 export function moveOp(subject: Subject, delta: V3, copy: boolean, count = 1, autofold = false): KernelOp {
   const xform: Xform = translation(delta);
+  // sketchcraft E-58: Ctrl on faces of a solid copies their outlines (a building's base to put
+  // elsewhere) instead of reshaping the solid.
+  if (subject.kind === "geometry" && copy && subject.faceRings?.length) {
+    const ops = outlineCopyOps(subject.faceRings, delta);
+    return ops.length === 1 ? ops[0] : { op: "batch", ops };
+  }
   if (subject.kind === "geometry") return geometryOp(subject, xform, autofold);
   return objectsOp(subject, xform, copy, count);
+}
+
+const add3 = (p: V3, d: V3): V3 => [p[0] + d[0], p[1] + d[1], p[2] + d[2]];
+
+/** Each face's rings, moved by `delta`, drawn closed on its plane (Newell normal). */
+export function outlineCopyOps(faces: V3[][][], delta: V3): KernelOp[] {
+  const ops: KernelOp[] = [];
+  for (const rings of faces) {
+    const outer = rings[0];
+    if (!outer || outer.length < 3) continue;
+    const n: V3 = [0, 0, 0];
+    for (let k = 0; k < outer.length; k++) {
+      const [p, q] = [outer[k], outer[(k + 1) % outer.length]];
+      n[0] += (p[1] - q[1]) * (p[2] + q[2]);
+      n[1] += (p[2] - q[2]) * (p[0] + q[0]);
+      n[2] += (p[0] - q[0]) * (p[1] + q[1]);
+    }
+    const l = Math.hypot(...n) || 1;
+    const normal: V3 = [n[0] / l, n[1] / l, n[2] / l];
+    for (const r of rings) {
+      const pts = r.map((p): V3 => [p[0] + delta[0], p[1] + delta[1], p[2] + delta[2]]);
+      ops.push({ op: "draw", target: { on: "plane", origin: pts[0], normal }, points: pts, closed: true });
+    }
+  }
+  return ops;
 }
 
 export class MoveTool extends Tool {
@@ -226,6 +257,7 @@ export class MoveTool extends Tool {
 
   /** The status line during a gesture: says plainly whether it moves or copies. */
   gestureStatus(subject: Subject): string {
+    if (this.copy && subject.kind === "geometry" && subject.faceRings?.length) return `Copying the outline of ${subject.what}: the solid stays; the copy lands as a flat face. Move and click, or type a distance. Tap Ctrl to move the face instead.`;
     if (this.copy && subject.kind === "objects") return `Copying ${describeSubject(subject, this.host.mesh())}: the original stays. Move and click (or drag), or type a distance. Tap Ctrl to move it instead.`;
     return `Moving ${describeSubject(subject, this.host.mesh())}: move and click (or drag), or type a distance. ${subject.kind === "objects" ? "Ctrl copies." : "Alt toggles autofold."}`;
   }
@@ -297,6 +329,7 @@ export class MoveTool extends Tool {
     const pushed = h.target();
     const r = await h.apply(op, (res: EditResult) => {
       const o = res.outcome;
+      if (copy && subject.kind === "geometry" && subject.faceRings?.length) return `Copied the outline of ${what} ${how}: a flat face there (Push/Pull raises it).`;
       if (isCopied(o) && count > 1) return `Array: ${count} copies of ${what}, ${how} apart. Type another count, or a distance.`;
       if (isCopied(o)) return `Copied ${what} ${how}. Type x3 for more copies, or /4 to divide the distance.`;
       if (o.kind === "geometry_moved") return `Moved ${what} ${how}${o.faces.length ? ` (${o.faces.length} faces changed)` : ""}.`;
@@ -327,7 +360,12 @@ export class MoveTool extends Tool {
       const d = sub(g.to, g.from);
       const k = this.snap?.kind;
       const color = k === "axis-x" || k === "axis-y" || k === "axis-z" || k === "parallel" || k === "perpendicular" ? INFERENCE_STYLES[k].token : "--sel";
-      overlay.push({ kind: "segments" as const, points: [...previewSegments(g.subject, g.edges, translation(d)), ...sketchSegments(g.sk, translation(d), this.copy)], color: this.copy ? "--ok" : "--sel", width: 1.5 });
+      // sketchcraft E-58: a copy of faces of a solid previews their outlines only.
+      const rings = this.copy && g.subject.kind === "geometry" ? (g.subject.faceRings ?? []) : [];
+      const body = rings.length
+        ? rings.flatMap((rs) => rs.flatMap((r) => r.flatMap((p, k): V3[] => [add3(p, d), add3(r[(k + 1) % r.length], d)])))
+        : previewSegments(g.subject, g.edges, translation(d));
+      overlay.push({ kind: "segments" as const, points: [...body, ...sketchSegments(g.sk, translation(d), this.copy)], color: this.copy ? "--ok" : "--sel", width: 1.5 });
       overlay.push({ kind: "segments" as const, points: [g.from, g.to], color, width: 1.75, dashed: true });
       label.push({ at: g.to, text: `${this.host.fmt(len(d))}${this.copy ? " +" : ""}`, className: "live" });
     }
