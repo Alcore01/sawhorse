@@ -644,3 +644,10 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 1 scénario noyau (enregistrer et relire, normalisation, empreinte inchangée à 0, refus d'une valeur non numérique) ; 2 scénarios interface (orientation avec le nord tourné ; nord après un tour) ; 1 de traduction ; cargo 778, clippy et fmt propres ; vitest 1237, `tsc -b` et build propres ; dans Chrome sans écran (en français) : rose en vue Iso (N dans la direction du vert) et en vue de dessus (N en haut, E à droite), clic sur la rose → dialogue « Nord ». Niveau : testé (banc : 4 scénarios) et essayé. Non vérifié : Aligner puis la rose avec le nouveau noyau (pas de cible wasm ici : le noyau du navigateur d'essai est l'ancien) ; chez JC.
 - Limites connues : demande `npm run wasm` (ou le lanceur, qui le fait).
+
+## H-20261124-4 · rectification · documentation · H-20261124-3 : un ancien VolumeCraft ouvre bien un fichier avec `north`
+
+- Origine : vérification de Claude juste après H-20261124-3, dont « Effet sur les projets » disait non vérifié qu'une version plus ancienne pourrait refuser le champ `north`.
+- Constat : le lecteur du scene.json n'interdit pas les champs inconnus (aucun `deny_unknown_fields` dans `crates/kernel/src/snapshot.rs`) : une version plus ancienne ouvre le fichier et ignore le nord (nord le long du vert).
+- Fichiers : aucun (HISTORIQUE seulement).
+- Vérification : lecture du code (recherche de `deny_unknown_fields` : aucune occurrence).
