@@ -780,6 +780,29 @@ mod tests {
     }
 
     #[test]
+    fn north_is_saved_and_read_back() {
+        // sketchcraft E-62: where north is goes with the document; a model never turned keeps
+        // its hash (north 0 is not written).
+        let d = sample();
+        let mut m = d.model().clone();
+        let h0 = m.hash();
+        m.apply(&sawhorse_kernel::model::Op::SetNorth { degrees: -200.0 })
+            .unwrap();
+        assert_eq!(m.north(), 160.0, "kept in (-180, 180]");
+        assert_ne!(m.hash(), h0);
+        let back = read(&write(&m, &SaveOptions::default()).unwrap()).unwrap();
+        assert_eq!(back.document.model().north(), 160.0);
+        assert_eq!(back.document.model().hash(), m.hash());
+        m.apply(&sawhorse_kernel::model::Op::SetNorth { degrees: 360.0 })
+            .unwrap();
+        assert_eq!(m.hash(), h0, "back to north along green: the old hash");
+        assert!(
+            m.apply(&sawhorse_kernel::model::Op::SetNorth { degrees: f64::NAN })
+                .is_err()
+        );
+    }
+
+    #[test]
     fn a_long_flat_group_name_is_clipped_so_the_file_saves_again() {
         // E-47: GeoHVAC's native export names its group "GeoHVAC · bâtiment …" with more
         // than 64 characters in `groups`; the file opened, then Save refused it.

@@ -70,7 +70,7 @@ import type { ExportOptions, ImportUnit, OpOutcome } from "./kernel/types";
 import { ImportReport, type Report } from "./components/ImportReport";
 import { NameDialog, type NameRequest } from "./components/NameDialog";
 import { parseAlong } from "./lib/extrudeAlong";
-import { facadeAngle, planCentre, solidEdges, wallAngle } from "./lib/align";
+import { facadeAngle, northAfterTurn, planCentre, solidEdges, wallAngle } from "./lib/align";
 import { meshPoints, type PickFilter } from "./lib/pickFilter";
 import { selectionInfo } from "./lib/properties";
 import { getLang, LANGS, setLang, type Lang } from "./lib/i18n";
@@ -1702,6 +1702,23 @@ export function App() {
   );
   doneRef.current = () => selectTool("select");
 
+  /** sketchcraft E-62: View > North…: where north is, degrees clockwise from green (0: along
+   * green, as GeoHVAC's coordinates come). Also a click on the compass rose. */
+  const askNorth = useCallback(() => {
+    const now = live.current.scene?.state.north ?? 0;
+    setNameRequest({
+      title: "North",
+      label: "Degrees clockwise from green (+Y) to north",
+      value: String(Math.round(now * 100) / 100),
+      ok: "Set",
+      onOk: (text) => {
+        const d = Number(text.replace(",", ".").replace(/°/g, "").trim());
+        if (!Number.isFinite(d)) return void setMessage({ text: "Type a number of degrees.", error: true });
+        void apply({ op: "set_north", degrees: d }, () => `North set at ${d}° clockwise from green.`);
+      },
+    });
+  }, [apply]);
+
   /** sketchcraft E-58: Edit > Copy (Ctrl+C): what is selected, for Edit > Paste. Solids,
    * groups and components by id; faces and loose faces as their outline; edges as lines. */
   const copySelection = useCallback(async () => {
@@ -1855,7 +1872,7 @@ export function App() {
     const st = scene?.state;
     if (!st) return;
     const blobs = scene?.textures ?? [];
-    engineObj?.setLooks({ materials: st.materials, textures: st.textures, style: st.style ?? null, shadows: shadowPreview ?? st.shadows ?? null, blobs });
+    engineObj?.setLooks({ materials: st.materials, textures: st.textures, style: st.style ?? null, shadows: shadowPreview ?? st.shadows ?? null, blobs, north: st.north ?? 0 });
     // Section planes and their cuts (lane 12), after the style that says how they show.
     engineObj?.setSections(scene?.sections ?? null, st.graph?.sections ?? []);
     const fresh = blobs.filter((b) => !swatches[`tex:${b.digest}`]);
@@ -2076,7 +2093,9 @@ export function App() {
     const deg = (a * 180) / Math.PI;
     if (Math.abs(deg) < 0.005) return void setMessage({ text: "Already lined up with red and green.", error: false });
     const xform = rotation(planCentre(edges), [0, 0, 1], -a);
-    await apply({ op: "transform", objects, xform }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the walls run along red and green. Its real orientation is ${deg.toFixed(2)}° from this (north for the sun and shadows); Undo turns it back.`);
+    // sketchcraft E-62: north turns with the building (one undo step for both).
+    const north = northAfterTurn(live.current.scene?.state.north ?? 0, deg);
+    await apply({ op: "batch", ops: [{ op: "transform", objects, xform }, { op: "set_north", degrees: north }] }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the walls run along red and green. North turned with it (${north.toFixed(2)}° from green; the compass rose shows it); Undo turns both back.`);
   }, [apply]);
 
   /** sketchcraft E-50: Volume > Clean Up Points: in the selected solids and sketches (all of
@@ -2161,7 +2180,8 @@ export function App() {
     const deg = (a * 180) / Math.PI;
     if (Math.abs(deg) < 0.005) return void setMessage({ text: "That façade already faces along red or green.", error: false });
     const xform = rotation(planCentre(solidEdges(mesh, new Set(objects))), [0, 0, 1], -a);
-    await apply({ op: "transform", objects, xform }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the selected façade faces along ${Math.abs(Math.cos(Math.atan2(part.normal[1], part.normal[0]) - a)) > 0.7 ? "red" : "green"}. Its real orientation is ${deg.toFixed(2)}° from this (north for the sun and shadows); Undo turns it back.`);
+    const north = northAfterTurn(live.current.scene?.state.north ?? 0, deg);
+    await apply({ op: "batch", ops: [{ op: "transform", objects, xform }, { op: "set_north", degrees: north }] }, () => `Turned ${Math.abs(deg).toFixed(2)}° ${deg > 0 ? "clockwise" : "anticlockwise"} about blue: the selected façade faces along ${Math.abs(Math.cos(Math.atan2(part.normal[1], part.normal[0]) - a)) > 0.7 ? "red" : "green"}. North turned with it (${north.toFixed(2)}° from green; the compass rose shows it); Undo turns both back.`);
   }, [apply]);
 
   /** sketchcraft E-40: Volume > Unify Imported Meshes: each imported mesh, one undo step
@@ -3374,6 +3394,7 @@ export function App() {
         { label: "Sheets", checked: mode === "sheets", title: "Drawing sheets: scaled views of the model on paper", onSelect: () => setMode("sheets") },
         "-",
         { label: "Zoom Extents", keys: "Shift+Z", onSelect: zoomExtents },
+        { label: "North…", title: "Where north is (the compass rose, the Info pane's orientations and the sun follow)", onSelect: askNorth },
         "-",
         { label: "Perspective", checked: projection === "perspective", onSelect: () => setProjection((p) => (p === "perspective" ? "parallel" : "perspective")) },
         { label: "Grid", checked: gridShown(st?.style), title: "Show or hide the ground grid (saved with the document and with each scene)", onSelect: () => setGrid(!gridShown(st?.style)) },
@@ -3436,7 +3457,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, alignFacade, cleanPoints, copySelection, pasteClip, lang, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, alignFacade, cleanPoints, copySelection, pasteClip, lang, askNorth, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;
@@ -3576,6 +3597,8 @@ export function App() {
         }}
         onAxisView={setView}
         onRightClick={onRightClick}
+        north={st?.north ?? 0}
+        onNorth={askNorth}
         bottomLead={
           <>
             <PickFilterSwitch

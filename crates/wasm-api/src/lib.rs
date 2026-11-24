@@ -145,6 +145,8 @@ struct DocState<'a> {
     /// The drawing style and the sun (lane 10); `null`: the defaults.
     style: Option<&'a sawhorse_kernel::looks::Style>,
     shadows: Option<&'a sawhorse_kernel::looks::Shadows>,
+    /// sketchcraft E-62: where north is, degrees clockwise from green (+Y).
+    north: f64,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -502,6 +504,7 @@ impl DocCore {
                 .collect(),
             style: m.style(),
             shadows: m.shadows(),
+            north: m.north(),
         };
         serde_json::to_string(&st).unwrap_or_else(|_| "{}".to_string())
     }

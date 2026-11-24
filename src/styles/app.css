@@ -561,3 +561,11 @@ button.chip:hover{border-color:var(--accent)}
 .info-pane .info-row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);font:12px var(--mono)}
 .info-pane dt{color:var(--muted)}
 .info-pane dd{margin:0;text-align:right}
+/* sketchcraft E-62: the compass rose under the axes. */
+.vp .compass-rose{position:absolute;top:110px;right:10px;z-index:4;cursor:pointer;user-select:none;overflow:visible}
+.vp .compass-rose .rose-axis{stroke:var(--muted);stroke-width:1.2}
+.vp .compass-rose .rose-north{fill:#d63a32}
+.vp .compass-rose .rose-north.dark{fill:#9e2520}
+.vp .compass-rose .rose-south{fill:var(--panel);stroke:var(--muted);stroke-width:1}
+.vp .compass-rose text{font:700 10px var(--mono);fill:var(--muted)}
+.vp .compass-rose .rose-n{fill:#d63a32;font-size:12px}

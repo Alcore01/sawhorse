@@ -93,6 +93,10 @@ export interface ViewportProps {
   /** sketchcraft E-57: a right click that did not drag (a drag pans): the menu at the pointer
    * (page coordinates). */
   onRightClick?: (x: number, y: number) => void;
+  /** sketchcraft E-62: where north is (degrees clockwise from green), for the compass rose;
+   * a click on the rose asks for it. */
+  north?: number;
+  onNorth?: () => void;
 }
 
 /** Read-only hooks for e2e tests and lane-end captures (scripts/capture*.mjs, e2e/*.spec.ts). */
@@ -388,6 +392,7 @@ export function Viewport(props: ViewportProps) {
       )}
       <div className="axes">{t("x ─ red · y ─ green · z ─ blue")}</div>
       {engine ? <AxisGizmo frame={engine.axisFrame()} onView={props.onAxisView} /> : null}
+      {engine ? <CompassRose frame={engine.axisFrame()} north={props.north ?? 0} onClick={props.onNorth} /> : null}
     </main>
   );
 }
@@ -419,6 +424,53 @@ function AxisGizmo({ frame, onView }: { frame: { x: Vec3; y: Vec3; z: Vec3 }; on
           ) : null}
         </g>
       ))}
+    </svg>
+  );
+}
+
+/** sketchcraft E-62: the compass rose under the axes, lying on the ground as the camera sees it
+ * (foreshortened when the view is tilted), with north where the document says (turned with the
+ * building by the Align commands, or set by View > North…). A click asks where north is. */
+function CompassRose({ frame, north, onClick }: { frame: { x: Vec3; y: Vec3; z: Vec3 }; north: number; onClick?: () => void }) {
+  const size = 96;
+  const c = size / 2;
+  const r = 34;
+  const rad = (north * Math.PI) / 180;
+  // A ground direction (dx, dy) as the camera sees it, in pixels (y down).
+  const at = (dx: number, dy: number, k = r): [number, number] => {
+    const sx = dx * frame.x[0] + dy * frame.y[0];
+    const sy = dx * frame.x[1] + dy * frame.y[1];
+    return [c + sx * k, c - sy * k];
+  };
+  const n: [number, number] = [Math.sin(rad), Math.cos(rad)];
+  const e: [number, number] = [Math.cos(rad), -Math.sin(rad)];
+  const p = (u: [number, number], k = r) => at(u[0], u[1], k);
+  const neg = (u: [number, number]): [number, number] => [-u[0], -u[1]];
+  const side = (u: [number, number], k: number): [number, number] => [u[0] * k, u[1] * k];
+  const tip = p(n);
+  const tail = p(neg(n), r * 0.75);
+  const l = p(side(neg(e), 0.16), r);
+  const rr = p(side(e, 0.16), r);
+  const pts = (...q: [number, number][]) => q.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const label = (u: [number, number], s: string) => {
+    const [x, y] = p(u, r + 9);
+    return (
+      <text x={x} y={y} dy="0.35em" textAnchor="middle" className={s === "N" ? "rose-n" : "rose-l"}>
+        {t(s)}
+      </text>
+    );
+  };
+  return (
+    <svg className="compass-rose" data-testid="compass-rose" width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="button" aria-label={`${t("North")}: ${north.toFixed(1)}°`} onClick={onClick}>
+      <title>{`${t("North")}: ${north.toFixed(1)}° ${t("from green")} (${t("click to set it")})`}</title>
+      <line x1={p(e)[0]} y1={p(e)[1]} x2={p(neg(e))[0]} y2={p(neg(e))[1]} className="rose-axis" />
+      <polygon points={pts(tip, [c, c], l)} className="rose-north" />
+      <polygon points={pts(tip, [c, c], rr)} className="rose-north dark" />
+      <polygon points={pts(tail, [c, c], l, rr)} className="rose-south" />
+      {label(n, "N")}
+      {label(e, "E")}
+      {label(neg(n), "S")}
+      {label(neg(e), "W")}
     </svg>
   );
 }

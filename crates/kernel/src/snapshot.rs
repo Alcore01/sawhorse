@@ -449,6 +449,9 @@ pub struct Snapshot {
     pub style: Option<crate::looks::Style>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadows: Option<crate::looks::Shadows>,
+    /// sketchcraft E-62: where north is, degrees clockwise from green (+Y); absent: 0.
+    #[serde(default, skip_serializing_if = "is_zero_f64")]
+    pub north: f64,
     /// Section planes (lane 12), in id order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sections: Vec<SnapSection>,
@@ -466,6 +469,11 @@ pub struct SnapSheet {
     pub id: Option<u64>,
     #[serde(flatten)]
     pub sheet: crate::sheets::Sheet,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero_f64(x: &f64) -> bool {
+    *x == 0.0
 }
 
 fn is_zero(n: &u64) -> bool {
@@ -1098,6 +1106,7 @@ impl Model {
                 .collect(),
             style: self.style.clone(),
             shadows: self.shadows,
+            north: self.north,
             sections: self
                 .sections()
                 .into_iter()
@@ -1439,6 +1448,9 @@ impl Model {
         }
         if let Some(sh) = &s.shadows {
             m.set_shadows(Some(sh))?;
+        }
+        if s.north != 0.0 {
+            m.set_north(s.north)?;
         }
         for (t, v) in &s.tags {
             m.tags.insert(t.clone(), *v);

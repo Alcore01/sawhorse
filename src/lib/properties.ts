@@ -44,11 +44,11 @@ export function faceKind(n: V3): "wall" | "roof" | "floor" {
 
 const POINTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
-/** Where a face looks, in degrees clockwise from north (+Y, green, as the sun uses), and the
- * nearest of the eight compass points. */
-export function azimuth(n: V3): { deg: number; point: string } {
-  let deg = (Math.atan2(n[0], n[1]) * 180) / Math.PI;
-  if (deg < 0) deg += 360;
+/** Where a face looks, in degrees clockwise from north, and the nearest of the eight compass
+ * points. North is `north` degrees clockwise of green (+Y) (E-62; 0: along green). */
+export function azimuth(n: V3, north = 0): { deg: number; point: string } {
+  let deg = (Math.atan2(n[0], n[1]) * 180) / Math.PI - north;
+  deg = ((deg % 360) + 360) % 360;
   return { deg, point: POINTS[Math.round(deg / 45) % 8] };
 }
 
@@ -115,13 +115,13 @@ function envelopeRows(faces: FaceFacts[], u: UnitSystem): InfoRow[] {
   ];
 }
 
-function faceRows(f: FaceFacts, u: UnitSystem): InfoRow[] {
+function faceRows(f: FaceFacts, u: UnitSystem, north = 0): InfoRow[] {
   const rows: InfoRow[] = [
     { label: "Area", value: fmtArea(f.area, u) },
     { label: "Kind", value: f.kind === "wall" ? "Wall" : f.kind === "roof" ? "Roof" : "Floor (facing down)" },
   ];
   if (f.kind !== "floor" && Math.hypot(f.normal[0], f.normal[1]) > 1e-6) {
-    const a = azimuth(f.normal);
+    const a = azimuth(f.normal, north);
     rows.push({ label: "Facing", value: `${a.point} · ${a.deg.toFixed(1)}° from north` });
   }
   if (f.kind === "roof") rows.push({ label: "Slope", value: `${slope(f.normal).toFixed(1)}°` });
@@ -160,7 +160,7 @@ export function selectionInfo(selection: Entity[], mesh: MeshData | null, state:
         const i = partOf(e);
         if (i < 0) break;
         const f: FaceFacts = { area: areas[i], kind: faceKind(mesh.parts[i].normal), normal: mesh.parts[i].normal };
-        return { title: e.kind === "face" ? "Face of a solid" : "Face", rows: faceRows(f, u) };
+        return { title: e.kind === "face" ? "Face of a solid" : "Face", rows: faceRows(f, u, state?.north ?? 0) };
       }
       case "object": {
         return {

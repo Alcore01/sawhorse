@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { V3 } from "../kernel/types";
-import { facadeAngle, planCentre, wallAngle } from "./align";
+import { facadeAngle, northAfterTurn, planCentre, wallAngle } from "./align";
 
 /** A w x d box's level edges (floor and roof outline), turned by `a` about the origin. */
 function box(w: number, d: number, a: number): [V3, V3][] {
@@ -59,5 +59,13 @@ describe("Align Façade to Axes (sketchcraft E-48)", () => {
     expect(deg(facadeAngle(n(15, 0.5)))).toBeCloseTo(15, 9);
     expect(facadeAngle([0, 0, 1])).toBeNull();
     expect(facadeAngle([0.05, 0, -1])).toBeNull();
+  });
+});
+
+describe("north turns with the building (sketchcraft E-62)", () => {
+  it("walls at 20° turned square: north, along green before, is 20° clockwise of green after", () => {
+    expect(northAfterTurn(0, 20)).toBe(20);
+    expect(northAfterTurn(170, 20)).toBe(-170);
+    expect(northAfterTurn(20, -20)).toBe(0);
   });
 });

@@ -555,6 +555,11 @@ pub enum Op {
     SetStyle {
         style: Option<crate::looks::Style>,
     },
+    /// sketchcraft E-62: where north is, degrees clockwise from green (+Y) seen from above
+    /// (see [`Model::north`]); kept in (-180, 180].
+    SetNorth {
+        degrees: f64,
+    },
     /// The document's sun and shadows (`None`: the default, off).
     SetShadows {
         shadows: Option<crate::looks::Shadows>,
@@ -1263,6 +1268,10 @@ pub struct Model {
     /// The drawing style (`None`: the default) and the sun and shadows (`None`: off).
     pub(crate) style: Option<crate::looks::Style>,
     pub(crate) shadows: Option<crate::looks::Shadows>,
+    /// sketchcraft E-62: where north is, degrees clockwise (seen from above) from green (+Y)
+    /// to north, in (-180, 180]; 0 (the default): north along green, as GeoHVAC's Lambert
+    /// coordinates come. Turning a building to line it up with the axes turns north with it.
+    pub(crate) north: f64,
     /// Saved views, in order.
     pub(crate) scenes: Vec<SceneDef>,
     /// Last display number handed to an object (see [`Object::number`]).
@@ -1697,6 +1706,28 @@ pub struct ModelStats {
 impl Model {
     pub fn new() -> Model {
         Model::default()
+    }
+
+    /// sketchcraft E-62: where north is, degrees clockwise from green (+Y) seen from above.
+    pub fn north(&self) -> f64 {
+        self.north
+    }
+
+    /// [`Op::SetNorth`]: kept in (-180, 180].
+    pub(crate) fn set_north(&mut self, degrees: f64) -> Result<OpOutcome, KernelError> {
+        if !degrees.is_finite() {
+            return Err(
+                DocumentError::NotAVolume("north must be a number of degrees".into()).into(),
+            );
+        }
+        let mut d = degrees % 360.0;
+        if d <= -180.0 {
+            d += 360.0;
+        } else if d > 180.0 {
+            d -= 360.0;
+        }
+        self.north = if d.abs() < 1e-12 { 0.0 } else { d };
+        Ok(OpOutcome::StyleSet)
     }
 
     /// A model with one sketch on the ground plane (public id 1), as the UI starts.
@@ -2669,6 +2700,7 @@ impl Model {
             Op::ClearPaint { items } => self.clear_paint(items),
             Op::SetFaceUv { object, face, uv } => self.set_face_uv(*object, *face, uv.as_ref()),
             Op::SetStyle { style } => self.set_style(style.as_ref()),
+            Op::SetNorth { degrees } => self.set_north(*degrees),
             Op::SetShadows { shadows } => self.set_shadows(shadows.as_ref()),
             Op::SetMaterial { object, material } => {
                 if let Some(m) = material

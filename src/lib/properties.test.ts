@@ -79,3 +79,11 @@ describe("Info pane measures (sketchcraft E-56)", () => {
     expect(p.rows.map((r) => r.value)).toEqual(["2", "3", "4"]);
   });
 });
+
+describe("orientation with north turned (sketchcraft E-62)", () => {
+  it("a wall facing green faces north when north is along green, west when north is 90° clockwise", () => {
+    expect(azimuth([0, 1, 0], 0).point).toBe("N");
+    expect(azimuth([0, 1, 0], 90).point).toBe("W");
+    expect(azimuth([1, 0, 0], 90)).toEqual({ deg: 0, point: "N" });
+  });
+});

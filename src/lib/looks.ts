@@ -125,7 +125,7 @@ export const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** Unit vector towards the sun (Z up, north +Y, east +X); z < 0 below the horizon. */
-export function sunDirection(s: Pick<Shadows, "month" | "day" | "minutes" | "latitude">): [number, number, number] {
+export function sunDirection(s: Pick<Shadows, "month" | "day" | "minutes" | "latitude">, north = 0): [number, number, number] {
   const rad = Math.PI / 180;
   const n = CUM[Math.min(12, Math.max(1, s.month)) - 1] + s.day;
   const decl = 23.44 * rad * Math.sin((360 / 365) * (n - 81) * rad);
@@ -133,7 +133,9 @@ export function sunDirection(s: Pick<Shadows, "month" | "day" | "minutes" | "lat
   const lat = s.latitude * rad;
   const alt = Math.asin(Math.min(1, Math.max(-1, Math.sin(lat) * Math.sin(decl) + Math.cos(lat) * Math.cos(decl) * Math.cos(ha))));
   const az = Math.atan2(-Math.sin(ha) * Math.cos(decl), Math.cos(lat) * Math.sin(decl) - Math.sin(lat) * Math.cos(decl) * Math.cos(ha));
-  return [Math.cos(alt) * Math.sin(az), Math.cos(alt) * Math.cos(az), Math.sin(alt)];
+  // sketchcraft E-62: azimuths count from north, which is `north` degrees clockwise of green.
+  const a = az + north * rad;
+  return [Math.cos(alt) * Math.sin(a), Math.cos(alt) * Math.cos(a), Math.sin(alt)];
 }
 
 /** "3:00 pm". */

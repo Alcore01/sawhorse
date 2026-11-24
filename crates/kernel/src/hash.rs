@@ -523,6 +523,11 @@ pub fn model_hash(m: &Model) -> u64 {
     if !m.sheet_order.is_empty() {
         m.hash_sheets(&mut h);
     }
+    // sketchcraft E-62: north, only when turned, so every older document keeps its hash.
+    if m.north != 0.0 {
+        h.tag("north");
+        h.u64(m.north.to_bits());
+    }
     h.finish()
 }
 

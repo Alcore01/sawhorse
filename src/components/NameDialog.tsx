@@ -1,6 +1,7 @@
 // A small naming dialog (Make Component): a title, a text field, OK and Cancel. Enter is
 // OK, Esc is Cancel. Shown over the viewport, in the import report's style.
 import { useState } from "react";
+import { t } from "../lib/i18n";
 
 export interface NameRequest {
   title: string;
@@ -21,10 +22,10 @@ export function NameDialog({ req, onClose }: { req: NameRequest; onClose: () => 
   return (
     <section className="name-dialog" role="dialog" aria-label={req.title}>
       <header>
-        <b>{req.title}</b>
+        <b>{t(req.title)}</b>
       </header>
       <label>
-        <span>{req.label}</span>
+        <span>{t(req.label)}</span>
         <input
           autoFocus
           value={v}
@@ -40,10 +41,10 @@ export function NameDialog({ req, onClose }: { req: NameRequest; onClose: () => 
       </label>
       <div className="btnrow">
         <button type="button" className="btn primary" disabled={!v.trim()} onClick={ok}>
-          {req.ok}
+          {t(req.ok)}
         </button>
         <button type="button" className="btn" onClick={onClose}>
-          Cancel
+          {t("Cancel")}
         </button>
       </div>
     </section>

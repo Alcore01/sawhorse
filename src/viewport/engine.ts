@@ -233,6 +233,8 @@ export class ViewportEngine {
   private ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 1000);
   private persp = new THREE.PerspectiveCamera(PERSPECTIVE_FOV_DEG, 1, 0.01, 1000);
   private camera: THREE.OrthographicCamera | THREE.PerspectiveCamera = this.ortho;
+  /** sketchcraft E-62: where north is, degrees clockwise from green. */
+  private north = 0;
   private controls: CameraController;
   /** Lane 30: what a left press does to the view (set by the app), null: the tool's. */
   private leftButton: ((mods: { alt: boolean; shift: boolean; macControl?: boolean }) => "orbit" | "pan" | null) | null = null;
@@ -601,7 +603,7 @@ export class ViewportEngine {
    * Materials, textures, the style and the sun (lane 10). `materials` and `textures` come
    * from the document state; `blobs` are images new to this UI (decoded once, by digest).
    */
-  setLooks(looks: { materials?: MaterialInfo[]; textures?: TextureInfo[]; style?: Style | null; shadows?: Shadows | null; blobs?: TextureBlob[] }): void {
+  setLooks(looks: { materials?: MaterialInfo[]; textures?: TextureInfo[]; style?: Style | null; shadows?: Shadows | null; blobs?: TextureBlob[]; north?: number }): void {
     // Images the model no longer holds are let go first, so their pixels do not count
     // against the ones that come in (lane 16).
     if (looks.textures) this.textures.keep(looks.textures.map((t) => t.digest));
@@ -616,11 +618,12 @@ export class ViewportEngine {
       this.updateGridVisibility();
       this.requestRender();
     }
-    const key = JSON.stringify([{ ...style, grid: true }, shadows, looks.materials, looks.textures]);
+    const key = JSON.stringify([{ ...style, grid: true }, shadows, looks.materials, looks.textures, looks.north ?? 0]);
     if (key === this.looksKey) return;
     this.looksKey = key;
     this.style = style;
     this.shadows = shadows;
+    this.north = looks.north ?? 0;
     this.colourGrid();
     this.buildFaces();
     this.requestRender();
@@ -655,7 +658,7 @@ export class ViewportEngine {
       textures: this.textures.size(),
       decoded: this.textures.stats(),
       texturedParts: this.texturedParts,
-      sun: this.lit() && this.shadows ? sunDirection(this.shadows) : null,
+      sun: this.lit() && this.shadows ? sunDirection(this.shadows, this.north) : null,
     };
   }
 
@@ -897,7 +900,7 @@ export class ViewportEngine {
     this.ambient.visible = lit;
     this.groundShadow.visible = lit && !!s?.ground;
     if (!lit || !s) return;
-    const dir = sunDirection(s);
+    const dir = sunDirection(s, this.north);
     const up = dir[2] > 0;
     // Sunlight and shade: the sliders, 0..100.
     this.sunLight.intensity = up ? (s.light / 100) * 2.4 : 0;

@@ -40,3 +40,11 @@ describe("interface language (sketchcraft E-59)", () => {
     expect(t("Some message nobody translated yet")).toBe("Some message nobody translated yet");
   });
 });
+
+describe("north in French (sketchcraft E-62)", () => {
+  it("the compass letters and the turn message", () => {
+    setLang("fr");
+    expect(t("W")).toBe("O");
+    expect(t("Turned 20.00° clockwise about blue: the walls run along red and green. North turned with it (20.00° from green; the compass rose shows it); Undo turns both back.")).toContain("le nord a tourné avec (20.00° depuis le vert");
+  });
+});

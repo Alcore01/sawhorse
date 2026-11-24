@@ -68,6 +68,8 @@ export type KernelOp =
   /** sketchcraft E-50: a point between two edges nearly in line removed (solid: world; sketch: plane coordinates); every such point of a solid. */
   | { op: "dissolve_point"; object: number; at: V3 }
   | { op: "dissolve_sketch_point"; sketch: number; at: [number, number] }
+  /** sketchcraft E-62: where north is, degrees clockwise from green (+Y) seen from above. */
+  | { op: "set_north"; degrees: number }
   | { op: "clean_points"; object: number }
   /** sketchcraft E-52: edges and faces of a solid erased as in SketchUp (merge, or the solid opens into plain faces). */
   | { op: "erase_solid_edges"; object: number; edges: [V3, V3][] }
@@ -478,6 +480,8 @@ export interface DocState {
   /** The drawing style and the sun (null: the defaults). */
   style?: Style | null;
   shadows?: Shadows | null;
+  /** sketchcraft E-62: where north is, degrees clockwise from green (+Y) seen from above; 0 or absent: along green. */
+  north?: number;
 }
 
 /** A material as the Materials pane shows it (crates/wasm-api `MaterialInfo`). */

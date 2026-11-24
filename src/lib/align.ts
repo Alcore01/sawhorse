@@ -66,3 +66,13 @@ export function facadeAngle(normal: V3): number | null {
   if (a <= -Math.PI / 4 + 1e-12) a += q;
   return a;
 }
+
+/** sketchcraft E-62: where north is after a turn of the building by minus `deg` (the turn the
+ * Align commands make: `deg` is the walls' or façade's angle from red, anticlockwise): north
+ * turns with it, so it moves `deg` clockwise. Kept in (-180, 180]. */
+export function northAfterTurn(north: number, deg: number): number {
+  let n = (north + deg) % 360;
+  if (n <= -180) n += 360;
+  else if (n > 180) n -= 360;
+  return n;
+}
