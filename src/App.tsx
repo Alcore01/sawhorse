@@ -61,7 +61,7 @@ import { InferenceMemory, kernelResolver, ToolDriver } from "./tools/driver";
 import { friendlyError, setNameSource } from "./lib/names";
 import { explodeOps } from "./lib/curves";
 import { autosaveEnabled, clearAutosave, clearOffered, describeAutosave, loadOffered, logIsWorth, MAX_AUTOSAVE_BYTES, pageWasReloaded, saveAutosave, takeAutosave, worthRestoring, type Autosave } from "./lib/autosave";
-import { ALL_EXTENSIONS, askYesNo, extensionOf, IMPORT_TYPES, isTauri, onTauriDrop, pickFile, readBrowserFile, saveFile, SHZ, stem, takeTauriPaths, type FileHandle, type PickedFile } from "./io/files";
+import { ALL_EXTENSIONS, askYesNo, canChooseWhere, extensionOf, IMPORT_TYPES, isTauri, typedFileName, onTauriDrop, pickFile, readBrowserFile, saveFile, SHZ, stem, takeTauriPaths, type FileHandle, type PickedFile } from "./io/files";
 import { closeHandler, desktopShell, discardQuestion } from "./io/closing";
 import { notOpenedNote, openLabel, startupOrder, takeStartupFile, waitingNote } from "./io/startup";
 import { showTitle } from "./io/title";
@@ -1030,16 +1030,33 @@ export function App() {
   }, [importBytes]);
 
   const save = useCallback(
-    async (as: boolean) => {
+    async (as: boolean, typedName?: string) => {
       const k = kernelRef.current;
       if (!k) return;
+      // sketchcraft E-63: where no Save dialog can be shown (Firefox), Save As (and the first
+      // Save) asks for the name first; the browser then puts the file in its downloads folder,
+      // or asks where when it is set to.
+      if (typedName === undefined && (as || !docName) && !canChooseWhere()) {
+        setNameRequest({
+          title: "Save As",
+          label: "File name (.shz)",
+          value: docName ? stem(docName) : "",
+          ok: "Save",
+          onOk: (text) => {
+            const n = typedFileName(text, ".shz");
+            if (!n) return void setMessage({ text: "Type a file name.", error: true });
+            void save(as, n);
+          },
+        });
+        return;
+      }
       try {
         await queue.current;
         const png = (await engineRef.current?.snapshotThumbnail(512)) ?? new Uint8Array();
         // Plugins' document-scoped stores ride along as plugin-data.json (lane 11), written by
         // the kernel's own writer (lane 16).
         const bytes = await k.saveShz(live.current.units, png, pluginsRef.current?.manager.doc.json() ?? "");
-        const name = `${docName ? stem(docName) : "Untitled"}.shz`;
+        const name = typedName ?? `${docName ? stem(docName) : "Untitled"}.shz`;
         const res = await saveFile(name, bytes, SHZ, as ? undefined : fileHandle.current);
         if (!res) return;
         setDocName(res.name);
@@ -1047,7 +1064,7 @@ export function App() {
         setSavedLogLen(live.current.scene?.state.log_len ?? null);
         // Saved: this session's autosave is not needed to get the work back (lane 16).
         markClean(live.current.scene?.state.log_hash ?? null);
-        setMessage({ text: `Saved ${res.name} (${(bytes.length / 1024).toFixed(0)} KB).`, error: false });
+        setMessage({ text: canChooseWhere() ? `Saved ${res.name} (${(bytes.length / 1024).toFixed(0)} KB).` : `Saved ${res.name} (${(bytes.length / 1024).toFixed(0)} KB) where the browser puts downloads (Firefox: Settings > Files and Applications > Always ask you where to save files, to choose the folder).`, error: false });
       } catch (e) {
         setMessage({ text: `Could not save: ${e instanceof Error ? e.message : String(e)}`, error: true });
       }

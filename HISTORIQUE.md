@@ -651,3 +651,14 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Constat : le lecteur du scene.json n'interdit pas les champs inconnus (aucun `deny_unknown_fields` dans `crates/kernel/src/snapshot.rs`) : une version plus ancienne ouvre le fichier et ignore le nord (nord le long du vert).
 - Fichiers : aucun (HISTORIQUE seulement).
 - Vérification : lecture du code (recherche de `deny_unknown_fields` : aucune occurrence).
+
+## H-20261124-5 · correction · interface · Enregistrer sous dans Firefox demande le nom (E-63)
+
+- Origine : JC (24 nov. 2026, 13 h 37) : « petit soucis , sauvegarder sous " sauvegarde un fichier untitled dans le dossier télechargement " » ; E-63.
+- Constat : Firefox (et Safari) n'offrent pas aux pages la fenêtre « Enregistrer sous » (File System Access, que Chrome et Edge ont) ; VolumeCraft retombait alors sur un téléchargement nommé d'après le document, « Untitled.shz » pour un document jamais nommé, dans le dossier des téléchargements.
+- Fichiers : `src/io/files.ts` (`canChooseWhere`, `typedFileName`) ; `src/io/savename.test.ts` (2 scénarios) ; `src/App.tsx` (sans fenêtre d'enregistrement possible, Enregistrer sous et le premier Enregistrer demandent le nom, puis téléchargent sous ce nom ; le message dit où va le fichier et comment faire choisir le dossier dans Firefox) ; `src/lib/i18n-fr.ts`.
+- Correction : Enregistrer sous… ouvre « Enregistrer sous / Nom du fichier (.shz) », prérempli du nom actuel ; le fichier est téléchargé sous ce nom (extension ajoutée, caractères interdits remplacés). Le dossier reste celui du navigateur ; Firefox le demande si « Toujours demander où enregistrer les fichiers » est coché (le message le rappelle). Chrome, Edge et l'application de bureau gardent leur vraie fenêtre.
+- Écarté : un faux sélecteur de dossier dans la page (impossible dans un navigateur sans cette interface).
+- Effet sur les projets : aucun.
+- Confidentialité : non.
+- Vérification : 2 scénarios (nom avec accents, extension une seule fois, caractères interdits, nom vide refusé) ; vitest 1239, `tsc -b` et build propres ; dans Chrome sans écran, la fenêtre d'enregistrement retirée pour imiter Firefox : Ctrl+Maj+S → dialogue en français → téléchargement « maison.shz » et message. Niveau : essayé. Non vérifié : Firefox lui-même ; Chrome sans écran d'ici renomme « download » un téléchargement dont le nom a un accent (« relevé.shz »), même hors VolumeCraft (essai direct) : à vérifier dans Firefox chez JC.

@@ -329,6 +329,23 @@ export async function saveFile(name: string, bytes: Uint8Array, type: FileType, 
   return { name };
 }
 
+/** sketchcraft E-63: whether saving can show a Save dialog (the desktop app, or a browser
+ * with the File System Access API: Chrome, Edge). Firefox and Safari cannot: a save is a
+ * download, into the downloads folder unless the browser is set to ask. */
+export function canChooseWhere(): boolean {
+  return isTauri() || !!fsa();
+}
+
+/** A file name the person typed, made safe and given the type's extension. */
+export function typedFileName(text: string, ext: string): string | null {
+  const base = text
+    .trim()
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")
+    .replace(/\.+$/, "");
+  if (!base) return null;
+  return base.toLowerCase().endsWith(ext.toLowerCase()) ? base : `${base}${ext}`;
+}
+
 /** Hand the browser a file to save (its downloads folder, or its own Save dialog). */
 export function download(name: string, bytes: Uint8Array, mime: string): void {
   const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
