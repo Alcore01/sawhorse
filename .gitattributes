@@ -4,3 +4,6 @@
 *.icns binary
 *.wasm binary
 *.woff2 binary
+# sketchcraft E-60: Windows scripts keep Windows line endings.
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
