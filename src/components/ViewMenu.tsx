@@ -1,4 +1,5 @@
 // sketchcraft E-57: the view's right-click menu (its items: src/lib/viewMenu.ts).
+import { t } from "../lib/i18n";
 import { useEffect, useRef } from "react";
 import type { MenuItem } from "./TopBar";
 
@@ -30,13 +31,13 @@ export function ViewMenu({ x, y, items, onClose }: { x: number; y: number; items
             key={i}
             type="button"
             role="menuitem"
-            title={it.title}
+            title={it.title ? t(it.title) : undefined}
             onClick={() => {
               onClose();
               it.onSelect();
             }}
           >
-            {it.label}
+            {t(it.label)}
             {it.keys ? <kbd>{it.keys}</kbd> : null}
           </button>
         ),

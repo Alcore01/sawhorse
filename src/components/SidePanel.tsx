@@ -1,3 +1,4 @@
+import { t as tr } from "../lib/i18n";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { CutListPane, type CutListPaneProps } from "./CutListPane";
 import type { CreditsHandle } from "../credits/useCredits";
@@ -234,7 +235,7 @@ export function SidePanel({ credits, renderOn = true, capture, focusRender = 0, 
                 {PLUGIN_GLYPH}
               </svg>
             ) : (
-              t.label
+              tr(t.label)
             )}
           </button>
         ))}
@@ -242,42 +243,42 @@ export function SidePanel({ credits, renderOn = true, capture, focusRender = 0, 
 
       <section className="pane" id="pane-outliner" role="tabpanel" aria-labelledby="tab-outliner" hidden={pane !== "outliner"}>
         <h3>
-          Outliner <small>groups and components</small>
+          {tr("Outliner")} <small>{tr("groups and components")}</small>
         </h3>
         <Outliner {...outliner} />
-        <p className="note">Double-click in the model to edit in place (Esc leaves). Double-click a name to rename. Right-click for Make Group, Make Component, Make Unique, Explode, Lock.</p>
+        <p className="note">{tr("Double-click in the model to edit in place (Esc leaves). Double-click a name to rename. Right-click for Make Group, Make Component, Make Unique, Explode, Lock.")}</p>
       </section>
 
       <section className="pane" id="pane-info" role="tabpanel" aria-labelledby="tab-info" hidden={pane !== "info"}>
         <h3>
-          Info <small>what the selection measures</small>
+          {tr("Info")} <small>{tr("what the selection measures")}</small>
         </h3>
         <InfoPane {...info} />
       </section>
 
       <section className="pane" id="pane-tags" role="tabpanel" aria-labelledby="tab-tags" hidden={pane !== "tags"}>
-        <h3>Tags</h3>
+        <h3>{tr("Tags")}</h3>
         <TagsPane {...tags} />
-        <p className="note">Tags control visibility only. Geometry stays in its group.</p>
+        <p className="note">{tr("Tags control visibility only. Geometry stays in its group.")}</p>
       </section>
 
       <section className="pane" id="pane-cutlist" role="tabpanel" aria-labelledby="tab-cutlist" hidden={pane !== "cutlist"}>
         <h3>
-          Cut list <small>from components</small>
+          {tr("Cut list")} <small>{tr("from components")}</small>
         </h3>
         <CutListPane {...cutlist} wide={wide} panelWidth={width} onWide={wideWidth > SIDE_WIDTH ? (w) => setWidth(w ? wideWidth : SIDE_WIDTH) : undefined} />
       </section>
 
       <section className="pane" id="pane-materials" role="tabpanel" aria-labelledby="tab-materials" hidden={pane !== "materials"}>
         <h3>
-          Materials <small>paint with B</small>
+          {tr("Materials")} <small>{tr("paint with B")}</small>
         </h3>
         <MaterialsPane {...materials} />
       </section>
 
       <section className="pane" id="pane-styles" role="tabpanel" aria-labelledby="tab-styles" hidden={pane !== "styles"}>
         <h3>
-          Styles <small>and shadows</small>
+          {tr("Styles")} <small>{tr("and shadows")}</small>
         </h3>
         <StylesPane {...styles} />
       </section>
@@ -290,7 +291,7 @@ export function SidePanel({ credits, renderOn = true, capture, focusRender = 0, 
 
       <section className="pane" id="pane-plugins" role="tabpanel" aria-labelledby="tab-plugins" hidden={pane !== "plugins"}>
         <h3>
-          Plugins <small>sandboxed, with permissions</small>
+          {tr("Plugins")} <small>{tr("sandboxed, with permissions")}</small>
         </h3>
         <PluginsPane {...plugins} />
       </section>

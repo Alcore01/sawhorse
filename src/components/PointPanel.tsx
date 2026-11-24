@@ -1,6 +1,7 @@
 // sketchcraft E-49: the selection filter switch (All, Points, Edges, Faces) and the Point
 // panel: the X, Y, Z of the one selected point, each editable (Enter moves the point there;
 // only the field typed in changes, so a rounded display never nudges the others).
+import { t } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import type { V3 } from "../kernel/types";
 import { formatLength, parseLength, type UnitSystem } from "../lib/units";
@@ -16,10 +17,10 @@ const FILTERS: { id: PickFilter; label: string; title: string }[] = [
 export function PickFilterSwitch({ filter, onFilter }: { filter: PickFilter; onFilter: (f: PickFilter) => void }) {
   return (
     <div className="pick-filter" role="radiogroup" aria-label="Selection filter">
-      <b className="bar-title">Select</b>
+      <b className="bar-title">{t("Select")}</b>
       {FILTERS.map((f) => (
-        <button key={f.id} type="button" role="radio" aria-checked={filter === f.id} data-filter={f.id} onClick={() => onFilter(f.id)} title={f.title}>
-          {f.label}
+        <button key={f.id} type="button" role="radio" aria-checked={filter === f.id} data-filter={f.id} onClick={() => onFilter(f.id)} title={t(f.title)}>
+          {t(f.label)}
         </button>
       ))}
     </div>
@@ -51,7 +52,7 @@ export function PointPanel({ at, units, onMove, onError }: PointPanelProps) {
   };
   return (
     <div className="point-panel" data-testid="point-panel" role="group" aria-label="Selected point">
-      <strong>Point</strong>
+      <strong>{t("Point")}</strong>
       {(["X", "Y", "Z"] as const).map((n, i) => (
         <label key={n} className={`axis-${n.toLowerCase()}`}>
           {n}

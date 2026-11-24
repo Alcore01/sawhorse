@@ -1,3 +1,4 @@
+import { t as tr } from "../lib/i18n";
 import { TOOL_GROUPS, type BuiltinToolId, type ToolDef, type ToolId } from "../lib/tools";
 import { PLUGIN_GLYPH, TOOL_GLYPHS } from "./glyphs";
 
@@ -27,7 +28,7 @@ export function ToolRail({ active, onSelect, plugins = [] }: ToolRailProps) {
               data-tool={t.id}
               aria-pressed={active === t.id}
               aria-keyshortcuts={t.plugin ? undefined : t.key === " " ? "Space" : t.keyCap || undefined}
-              title={t.plugin ? `${t.label} (${t.plugin})${t.keyCap ? ` ${t.keyCap}` : ""}` : t.key ? `${t.label} (${t.key === " " ? "Space" : t.keyCap})` : t.label}
+              title={t.plugin ? `${tr(t.label)} (${t.plugin})${t.keyCap ? ` ${t.keyCap}` : ""}` : t.key ? `${tr(t.label)} (${t.key === " " ? "Space" : t.keyCap})` : tr(t.label)}
               onClick={() => onSelect(t.id)}
             >
               {/* Lane 12's Section Plane has no key: no key cap. */}
@@ -35,7 +36,7 @@ export function ToolRail({ active, onSelect, plugins = [] }: ToolRailProps) {
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 {glyph(t)}
               </svg>
-              <small>{t.label}</small>
+              <small>{tr(t.label)}</small>
             </button>
           ))}
         </div>

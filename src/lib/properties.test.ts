@@ -61,7 +61,7 @@ describe("Info pane measures (sketchcraft E-56)", () => {
   it("a wall facing south: its area and orientation", () => {
     const s = selectionInfo([{ kind: "face", object: 7, face: 3 }], box(), null, "m");
     const v = Object.fromEntries(s.rows.map((r) => [r.label, r.value]));
-    expect(v).toEqual({ Area: "8.00 m²", Kind: "Wall", Faces: "S · 180.0° from north" });
+    expect(v).toEqual({ Area: "8.00 m²", Kind: "Wall", Facing: "S · 180.0° from north" });
   });
 
   it("several faces add up; a point gives its coordinates", () => {

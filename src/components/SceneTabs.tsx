@@ -2,6 +2,7 @@
 // tags are hidden, and which group or component is open. Click a tab to go to it; "+"
 // saves the current view as a new scene; right-click a tab to update it to the current
 // view, rename it or delete it; double-click to rename.
+import { t } from "../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import type { SceneDef } from "../kernel/types";
 import { PanelGlyph } from "./glyphs";
@@ -83,7 +84,7 @@ export function SceneTabs({ scenes, active, onGo, onAdd, onUpdate, onRename, onD
       </div>
       <button type="button" className="scene-add" aria-label="Add a scene from the current view" title="Save the current view (camera, hidden tags, open group) as a scene" onClick={() => onAdd()}>
         <PanelGlyph name="plus" />
-        {scenes.length ? null : <span>Scene</span>}
+        {scenes.length ? null : <span>{t("Scene")}</span>}
       </button>
       {menu ? (
         <div className="ctxmenu" ref={ref} role="menu" aria-label={`Scene ${menu.name}`} style={{ left: menu.x, top: menu.y }}>

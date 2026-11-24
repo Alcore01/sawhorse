@@ -1,3 +1,4 @@
+import { t, tChip } from "../lib/i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { MeshData, MeshPart } from "../kernel/types";
 import { virtualShift } from "./KeyBar";
@@ -313,7 +314,7 @@ export function Viewport(props: ViewportProps) {
         {glError ? <span className="err">{glError}</span> : null}
         {hud.map((h, i) => (
           <span key={i} className={h.tone}>
-            {h.text}
+            {tChip(h.text)}
           </span>
         ))}
       </div>
@@ -349,7 +350,7 @@ export function Viewport(props: ViewportProps) {
           <span className="snap" aria-hidden="true" style={{ left: markerXY[0], top: markerXY[1], background: `var(${style.token})` }}></span>
           <div className="tip" id="tip" style={{ left: markerXY[0] + 12, top: markerXY[1] - 26 }}>
             <i style={{ background: `var(${style.token})` }}></i>
-            {marker.tip}
+            {t(marker.tip)}
           </div>
         </>
       ) : null}
@@ -359,19 +360,19 @@ export function Viewport(props: ViewportProps) {
         <div className="bottom-bar">
           {props.bottomLead}
         <div className="legend snaps" role="group" aria-label="Snapping">
-          <b className="bar-title">Snap</b>
+          <b className="bar-title">{t("Snap")}</b>
           {SNAP_SWITCHES.map((s) => {
             const on = props.snaps!.on(s.id);
             return (
-              <button key={s.id} type="button" aria-pressed={on} className={on ? "on" : "off"} title={`${s.label}: ${on ? "on" : "off"} (click to switch)`} onClick={() => props.snaps!.toggle(s.id)}>
+              <button key={s.id} type="button" aria-pressed={on} className={on ? "on" : "off"} title={`${t(s.label)}: ${on ? t("on") : t("off")} (${t("click to switch")})`} onClick={() => props.snaps!.toggle(s.id)}>
                 <i style={{ background: on ? `var(${s.token})` : "transparent", borderColor: `var(${s.token})` }}></i>
-                {s.label}
+                {t(s.label)}
               </button>
             );
           })}
           <span>
             <i style={{ background: `var(${INFERENCE_STYLES["on-face"].token})` }}></i>
-            {INFERENCE_STYLES["on-face"].label}
+            {t(INFERENCE_STYLES["on-face"].label)}
           </span>
         </div>
         </div>
@@ -380,12 +381,12 @@ export function Viewport(props: ViewportProps) {
           {LEGEND_KINDS.map((k) => INFERENCE_STYLES[k]).map((s) => (
             <span key={s.token}>
               <i style={{ background: `var(${s.token})` }}></i>
-              {s.label}
+              {t(s.label)}
             </span>
           ))}
         </div>
       )}
-      <div className="axes">x ─ red · y ─ green · z ─ blue</div>
+      <div className="axes">{t("x ─ red · y ─ green · z ─ blue")}</div>
       {engine ? <AxisGizmo frame={engine.axisFrame()} onView={props.onAxisView} /> : null}
     </main>
   );
@@ -409,7 +410,7 @@ function AxisGizmo({ frame, onView }: { frame: { x: Vec3; y: Vec3; z: Vec3 }; on
         ))}
       {dots.map((d) => (
         <g key={d.id} className="axis-dot" role="button" aria-label={`${d.positive ? "" : "minus "}${d.id.replace("-", "").toUpperCase()}: ${names[d.view]} view`} onClick={() => onView?.(d.view)}>
-          <title>{`${d.positive ? "+" : "−"}${d.id.replace("-", "").toUpperCase()}: look from this side (${names[d.view]})`}</title>
+          <title>{`${d.positive ? "+" : "−"}${d.id.replace("-", "").toUpperCase()}: ${t("look from this side")} (${t(names[d.view])})`}</title>
           <circle cx={c + d.x} cy={c + d.y} r={d.positive ? 9 : 7} fill={d.positive ? d.color : "var(--panel)"} fillOpacity={d.positive ? 1 : 0.85} stroke={d.color} strokeWidth={2} />
           {d.label ? (
             <text x={c + d.x} y={c + d.y} dy="0.35em" textAnchor="middle" className="axis-letter">

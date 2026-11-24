@@ -73,6 +73,7 @@ import { parseAlong } from "./lib/extrudeAlong";
 import { facadeAngle, planCentre, solidEdges, wallAngle } from "./lib/align";
 import { meshPoints, type PickFilter } from "./lib/pickFilter";
 import { selectionInfo } from "./lib/properties";
+import { getLang, LANGS, setLang, type Lang } from "./lib/i18n";
 import { viewMenuItems, viewMenuLabels } from "./lib/viewMenu";
 import { PasteTool, anchorOf, type Clip } from "./tools/paste";
 import { ViewMenu } from "./components/ViewMenu";
@@ -372,6 +373,8 @@ export function App() {
   const [toolId, setToolId] = useState<ToolId>("select");
   const tool = toolById(toolId);
   const [units, setUnits] = useState<UnitSystem>(loadUnits);
+  /** sketchcraft E-59: the interface language (the menus and panes read it as they render). */
+  const [lang, setLangState] = useState<Lang>(getLang);
   // sketchcraft E-49: the selection filter (read by the Select tool through the host).
   const [pickFilter, setPickFilter] = useState<PickFilter>("all");
   const pickFilterRef = useRef<PickFilter>("all");
@@ -3274,6 +3277,19 @@ export function App() {
             { label: "Choose…", title: "The unit picker beside the Value Control Box", onSelect: () => setUnitPickerOpen((n) => n + 1) },
           ],
         },
+        {
+          label: "Language",
+          items: LANGS.map((l) => ({
+            label: l.name,
+            checked: lang === l.id,
+            title: "The interface's language",
+            onSelect: () => {
+              setLang(l.id);
+              setLangState(l.id);
+              setMessage({ text: l.id === "fr" ? "Langue choisie : français." : "Language chosen: English.", error: false });
+            },
+          })),
+        },
         { label: "Settings…", title: "The render service (renders are off until one is set and answering)", onSelect: () => setSettingsOpen(true) },
       ],
       // sketchcraft E-53: the volume commands, out of Edit (JC, 19 nov. 2026 : « le menu
@@ -3420,7 +3436,7 @@ export function App() {
         : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, alignFacade, cleanPoints, copySelection, pasteClip, units, chooseUnits, closeShell, setMessage],
+    [st?.can_undo, st?.can_redo, st?.guides?.length, st?.meshes, st?.scenes, st?.graph, st?.style, toolId, apply, undo, redo, zoomExtents, projection, setView, selectAll, eraseSelection, selection, selItems, pendingRestore, restore, newDocument, openDialog, save, importDialog, importUnits, exportAs, exportSection, sectionAction, makeGroup, makeComponent, explode, explodeCurves, addScene, goScene, activeScene, plugins.menu, mode, setMode, scene?.sheets, exportSheets, setGrid, snapGrid, toggleSnapGrid, keyBar, explodeSolids, solidFromFaces, extrudeAlong, joinSolids, unifyMeshes, mergeFaces, autoMergeFaces, alignToAxes, alignFacade, cleanPoints, copySelection, pasteClip, lang, units, chooseUnits, closeShell, setMessage],
   );
 
   const valueLabel = active?.valueLabel() ?? null;

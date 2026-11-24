@@ -1,6 +1,7 @@
 // Model / Sheets (lane 12): the switch at the start of the tab row, and in Sheets mode the
 // sheets as tabs (click to show, double-click to rename, right-click to move or delete,
 // "+" to add one), in the scene tabs' row and style.
+import { t } from "../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import type { SheetRow } from "../kernel/sheetTypes";
 import { PanelGlyph } from "../components/glyphs";
@@ -10,11 +11,11 @@ export type WorkMode = "model" | "sheets";
 export function ModeSwitch({ mode, onMode, sheets }: { mode: WorkMode; onMode: (m: WorkMode) => void; sheets: number }) {
   return (
     <div className="mode-switch" role="radiogroup" aria-label="Model or sheets">
-      <button type="button" role="radio" aria-checked={mode === "model"} data-mode="model" onClick={() => onMode("model")} title="The 3D model">
-        Model
+      <button type="button" role="radio" aria-checked={mode === "model"} data-mode="model" onClick={() => onMode("model")} title={t("The 3D model")}>
+        {t("Model")}
       </button>
-      <button type="button" role="radio" aria-checked={mode === "sheets"} data-mode="sheets" onClick={() => onMode("sheets")} title="Drawing sheets: scaled views of the model on paper, dimensioned, with a title block">
-        Sheets{sheets ? <small>{sheets}</small> : null}
+      <button type="button" role="radio" aria-checked={mode === "sheets"} data-mode="sheets" onClick={() => onMode("sheets")} title={t("Drawing sheets: scaled views of the model on paper, dimensioned, with a title block")}>
+        {t("Sheets")}{sheets ? <small>{sheets}</small> : null}
       </button>
     </div>
   );

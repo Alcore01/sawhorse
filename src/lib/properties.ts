@@ -122,7 +122,7 @@ function faceRows(f: FaceFacts, u: UnitSystem): InfoRow[] {
   ];
   if (f.kind !== "floor" && Math.hypot(f.normal[0], f.normal[1]) > 1e-6) {
     const a = azimuth(f.normal);
-    rows.push({ label: "Faces", value: `${a.point} · ${a.deg.toFixed(1)}° from north` });
+    rows.push({ label: "Facing", value: `${a.point} · ${a.deg.toFixed(1)}° from north` });
   }
   if (f.kind === "roof") rows.push({ label: "Slope", value: `${slope(f.normal).toFixed(1)}°` });
   return rows;

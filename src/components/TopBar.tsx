@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "./glyphs";
 import { APP_CREDIT, APP_NAME } from "../lib/brand";
@@ -49,7 +50,7 @@ function Entry({ item: it, sub, setSub, close }: { item: MenuItem; sub: string |
     return (
       <span className="subwrap" onMouseEnter={() => !it.disabled && setSub(it.label)}>
         <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded={isOpen} disabled={it.disabled} onClick={() => setSub(it.label)}>
-          <span>{it.label}</span>
+          <span>{t(it.label)}</span>
           <kbd aria-hidden="true">▸</kbd>
         </button>
         {isOpen ? (
@@ -68,7 +69,7 @@ function Entry({ item: it, sub, setSub, close }: { item: MenuItem; sub: string |
       role={it.checked === undefined ? "menuitem" : "menuitemcheckbox"}
       aria-checked={it.checked}
       disabled={it.disabled}
-      title={it.title}
+      title={it.title ? t(it.title) : undefined}
       onMouseEnter={() => setSub(null)}
       onClick={() => {
         close();
@@ -77,7 +78,7 @@ function Entry({ item: it, sub, setSub, close }: { item: MenuItem; sub: string |
     >
       <span>
         {it.checked === undefined ? "" : it.checked ? "✓ " : "   "}
-        {it.label}
+        {t(it.label)}
       </span>
       {it.keys ? <kbd>{it.keys}</kbd> : null}
     </button>
@@ -123,7 +124,7 @@ export function TopBar({ view, onView, credits, showCredits = true, creditsState
                 aria-expanded={items ? open === m : undefined}
                 onClick={() => items && setOpen(open === m ? null : m)}
               >
-                {m}
+                {t(m)}
               </button>
               {items && open === m ? (
                 <div className="drop" role="menu" aria-label={m}>
@@ -139,8 +140,8 @@ export function TopBar({ view, onView, credits, showCredits = true, creditsState
       <div className="spacer"></div>
       <div className="views" role="group" aria-label="Views">
         {BAR_VIEWS.map((v) => (
-          <button key={v.id} type="button" title={v.title} aria-pressed={view === v.id} onClick={() => onView(v.id)}>
-            {v.label}
+          <button key={v.id} type="button" title={t(v.title)} aria-pressed={view === v.id} onClick={() => onView(v.id)}>
+            {t(v.label)}
           </button>
         ))}
       </div>
