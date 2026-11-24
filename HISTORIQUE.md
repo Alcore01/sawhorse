@@ -620,3 +620,14 @@ L'historique de Sawhorse avant la copie est dans git (`git log a7a637d`) et dans
 - Confidentialité : non.
 - Vérification : 5 scénarios ; vitest 1234, `tsc -b` et build propres ; dans Chrome sans écran réglé en français (fr-BE) : menus, barre d'outils, barre du bas, onglet Info et barre d'état en français (captures). Niveau : essayé. Non vérifié : Firefox chez JC.
 - Limites connues (étape 2) : boîtes de dialogue (Réglages, unités, extrusion…), liste de débit, matières, styles, feuilles, extensions, structure (noms « Solid 1 »), la plupart des messages des autres outils et du noyau restent en anglais. Les nombres gardent le point décimal (0.37) hors orientation.
+
+## H-20261124-2 · évolution · documentation · Lanceurs Linux et Windows, installation par utilisateur (E-60)
+
+- Origine : JC (24 nov. 2026, 09 h 23) : « un veritable script pour lancer volumecraft sous windows et linux , un programme d'installation » ; E-60.
+- Fichiers (nouveaux) : `packaging/linux/volumecraft.sh` (lanceur : Node ≥ 20, npm ci si besoin, noyau reconstruit si ses sources sont plus récentes et Rust/wasm-pack présents, sinon garde le noyau existant ; npm run build si besoin ; vite preview sur 127.0.0.1:4173 ; ouvre le navigateur ; --stop, --status) ; `packaging/linux/install.sh` (entrée de menu avec action Arrêter, icône, lien ~/.local/bin/volumecraft ; --uninstall) ; `packaging/windows/VolumeCraft.ps1` et `VolumeCraft.cmd` (lanceur, serveur caché, -Stop) ; `packaging/windows/install.ps1` et `Install VolumeCraft.cmd` (raccourcis menu Démarrer et bureau, avec icône ; -Uninstall) ; `packaging/README.md`.
+- Évolution : VolumeCraft se lance depuis le menu ou un raccourci, sans commandes npm ; relancé, il ne fait qu'ouvrir le navigateur ; « Stop VolumeCraft » l'arrête. Rien n'est écrasé sans copie : un fichier déjà en place est copié dans un dossier `backup-<date>`, et la désinstallation y déplace les fichiers au lieu de les supprimer.
+- Écarté : construire les installateurs Tauri ici (pas de cible wasm ni de Windows dans cet environnement ; le flux GitHub Actions existe, à lancer avec l'accord de JC : E-61).
+- Effet sur les projets : aucun.
+- Confidentialité : non (le serveur n'écoute que 127.0.0.1).
+- Vérification : Linux, dans un dossier personnel temporaire : premier lancement (reconstruction du noyau échouée ici faute de cible wasm → noyau existant gardé), serveur répondant (titre VolumeCraft), relance → navigateur seulement, --stop, --status ; lancement suivant sans nouvelle tentative de reconstruction ; install.sh (entrée de menu, icône, lien), réinstallation (copie de sauvegarde), --uninstall (déplacement). Niveau : essayé (Linux). Non vérifié : Windows (pas de PowerShell ici : scripts relus seulement) ; le menu d'un vrai bureau Linux chez JC.
+- Limites connues : le lanceur Windows ne construit pas le noyau (src\wasm\pkg doit exister).
